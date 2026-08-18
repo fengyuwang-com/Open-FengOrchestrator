@@ -1,0 +1,4 @@
+interface:
+  display_name: "CAO 舰队召唤"
+  short_description: "通过 CAO 控制面 API 召唤/管理 AI agent 舰队（自研闭源）"
+  default_prompt: "用 CAO 召唤 3 个 agent 研究 XX"

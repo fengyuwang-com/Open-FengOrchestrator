@@ -1,0 +1,43 @@
+# FengOrchestrator webcli — CI
+#
+# 触发：push(webcli 相关) / PR / 手动。在 ubuntu-latest 与 windows-latest 两个
+# 平台 × stable toolchain 矩阵上：cargo build --release → clippy(-D warnings) → cargo test。
+#
+# 布局：Cargo.toml 单二进制（src/main.rs），静态资源由 rust-embed 编译期内嵌。
+
+name: webcli CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }} / stable
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: webcli
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy
+          rustup default stable
+
+      - name: Build (release)
+        run: cargo build --release
+
+      - name: Lint (clippy, -D warnings)
+        run: cargo clippy -- -D warnings
+
+      - name: Test
+        run: cargo test

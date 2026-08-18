@@ -1,0 +1,22 @@
+# 文档/示例忽略
+.DS_Store
+Thumbs.db
+
+# 骨架源码（实际部署时另行 clone，不入库）
+cli-agent-orchestrator/
+
+# 本地临时
+*.tmp
+*.log
+
+# Python 运行时
+__pycache__/
+*.pyc
+
+# webcli 运行时生成（审计日志/启动日志不入库，密钥纪律）
+webcli/access.log
+webcli/server_out.log
+
+# ZCode 本地会话产物
+.zcode/
+logs/fleet/

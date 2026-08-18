@@ -1,0 +1,21 @@
+# Python 运行时 / 构建产物（src 布局）
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+
+# 运行时生成（审计日志 / 启动日志不入库）
+access.log
+server_out.log
+
+# 工具缓存
+.ruff_cache/
+.pytest_cache/
+
+# Rust 构建产物
+/target
+
+# 运行时审计日志（不入库）
+audit.log
