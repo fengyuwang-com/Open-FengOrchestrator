@@ -48,4 +48,4 @@ Claude Code ｜ Codex CLI ｜ OpenCode ｜ Hermes ｜ OpenClaw(可选) ｜ Z Cod
 
 ✅ 调研完成　✅ 选型锁定　🔄 本机首期：用 Hermes 验证「董事长→CEO→干事」手感　⬜ 目标机器部署
 
-_日期：2026-08-15 ｜ 骨架版本：cli-agent-orchestrator v2.4.1 ｜ 许可证：Apache-2.0_
+_日期：2026-08-15 ｜ 骨架版本：cli-agent-orchestrator v2.4.1 ｜ 许可证：AGPL-3.0 (GNU Affero General Public License v3.0)_
