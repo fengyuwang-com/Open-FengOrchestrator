@@ -10,9 +10,9 @@
 #   cao_fleet.sh kill <session>           删除会话（连 tmux 一起清）
 # 环境: CAO_API 默认 http://localhost:9889（Windows 侧直连 WSL 内 cao-server）
 set -euo pipefail
+export PYTHONIOENCODING=utf-8
 
 API="${CAO_API:-http://localhost:9889}"
-SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # WSL 内真实探测 binary 可执行性（provider 表 installed=true 可能是假阳性）
 # 注意 < /dev/null：否则 wsl 子进程会继承管道 stdin，把 while 循环剩余输入读走导致丢行
@@ -78,6 +78,7 @@ cmd_spawn() {
   esac
 
   echo "== 召唤 $count 个 agent（profile=$profile provider=${provider:-default} dir=$workdir）=="
+  local fail=0
   for i in $(seq 1 "$count"); do
     local name="${prefix}-$(date +%H%M%S)-$i"
     local body="{\"initial_message\": $(python -c "import json,sys; print(json.dumps(sys.argv[1]))" "$message")}"
@@ -93,32 +94,38 @@ d=json.load(sys.stdin)
 print(f\"  ✓ terminal_id={d.get('id')} status={d.get('status')} name={d.get('name')} session={d.get('session_name')}\")
 "
     else
-      echo "  ✗ 失败: $resp" | head -c 300; echo
+      echo "  ✗ 失败: $(echo "$resp" | head -c 300)"
+      fail=$((fail+1))
     fi
     sleep 1
   done
+  [ "$fail" -eq 0 ] || { echo "== $fail/$count 个召唤失败 ==" >&2; exit 1; }
 }
 
 cmd_list() {
-  curl -sf --max-time 10 "$API/sessions" | python -c "
+  local resp
+  resp=$(curl -sf --max-time 10 "$API/sessions") || { echo "错误: 无法获取会话列表（CAO server $API 不可达或无会话）" >&2; exit 1; }
+  echo "$resp" | python -c "
 import json,sys
 rows=json.load(sys.stdin)
 print(f\"共 {len(rows)} 个会话\")
 for s in rows:
     print(f\"  {s.get('name','?'):32s} {s.get('status','?')}  terminals={len(s.get('terminals',[]))}\")
-" 2>/dev/null || curl -sf --max-time 10 "$API/sessions"
+"
 }
 
 cmd_status() {
   [ -n "$1" ] || { echo "用法: status <session_name>"; exit 1; }
-  curl -sf --max-time 10 "$API/sessions/$1" | python -c "
+  local resp
+  resp=$(curl -sf --max-time 10 "$API/sessions/$1") || { echo "错误: 会话 $1 不存在（HTTP 404 或 server 不可达）" >&2; exit 1; }
+  echo "$resp" | python -c "
 import json,sys
 d=json.load(sys.stdin)
 s=d.get('session',d)
 print(f\"会话: {s.get('name')} 状态: {s.get('status','?')}\")
 for t in d.get('terminals',[]):
     print(f\"  terminal_id={t.get('id')}  provider={t.get('provider','?')}  profile={t.get('agent_profile','?')}  活跃={t.get('last_active','?')}\")
-" 2>/dev/null || curl -sf --max-time 10 "$API/sessions/$1"
+"
 }
 
 cmd_say() {
@@ -131,12 +138,15 @@ cmd_say() {
 
 cmd_out() {
   [ -n "$1" ] || { echo "用法: out <terminal_id>"; exit 1; }
-  curl -sf --max-time 15 "$API/terminals/$1/output?mode=last" | head -c 3000 || true
+  local resp
+  resp=$(curl -sf --max-time 15 "$API/terminals/$1/output?mode=last") || { echo "错误: terminal $1 不存在或无输出" >&2; exit 1; }
+  echo "$resp" | head -c 3000
 }
 
 cmd_kill() {
   [ -n "$1" ] || { echo "用法: kill <session_name>"; exit 1; }
-  curl -sf --max-time 15 -X DELETE "$API/sessions/$1" && echo "  ✓ 已删除会话 $1"
+  curl -sf --max-time 15 -X DELETE "$API/sessions/$1" || { echo "错误: 会话 $1 不存在（HTTP 404 或 server 不可达）" >&2; exit 1; }
+  echo "  ✓ 已删除会话 $1"
 }
 
 case "${1:-}" in
@@ -147,5 +157,5 @@ case "${1:-}" in
   say) shift; cmd_say "$@" ;;
   out) cmd_out "${2:-}" ;;
   kill) cmd_kill "${2:-}" ;;
-  *) sed -n '2,12p' "${BASH_SOURCE[0]}"; exit 1;;
+  *) sed -n '2,11p' "${BASH_SOURCE[0]}"; exit 1;;
 esac

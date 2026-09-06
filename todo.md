@@ -22,9 +22,9 @@
 ## 待办（MVP 之后）
 
 ### 编排演进
-- [ ] **CAO 全量编排实跑**：写 Hermes provider profile（`hermes chat --yolo`），经 `cao launch` + tmux 长驻会话驱动；验证会话审计、完成检测、`cao session list/read`。
+- [ ] **CAO 全量编排实跑**（保持待办）：写 Hermes provider profile（`hermes chat --yolo`），经 `cao launch` + tmux 长驻会话驱动；验证会话审计、完成检测、`cao session list/read`。注：日常指挥已可走 cao-ceo Skill + cao-fleet，本项为 CAO 原生全能力验证。
 - [x] 2026-08-15 **多 Worker 并行**：3 个 `hermes -z` 并行子进程实测真并行（wall-clock ≈ 单任务耗时，无串行）；webcli 改造即用 4 Hermes 并行分块（结构/测试/文档/CI），归集联调成功
-- [ ] **审批门**：当前 `hermes -z` 强制 auto-approve(YOLO)；需为"董事长只签不拆"补一层审批门（跑前批准/跑后打回）。参考 `tool-restrictions` / allowlist 收窄权限。
+- [x] **审批门已由 Code 在回路原生覆盖**（保障层拆穿结论，2026-08-23，无需自建）：CEO agent 在回路直接问董事长 = 天然审批门；签字验收打包呈批在 cao-ceo skill 里。原"hermes -z 强制 auto-approve 补审批门"方案作废。
 - [ ] **跨 provider 混合舰队**：验证 OpenCode/Codex(修复后)/Claude(若安装) 与 Hermes 混用、模型中立。
 
 ### Hermes / 环境治理
@@ -43,7 +43,9 @@
 
 ---
 
-_创建：2026-08-15 ｜ 状态：MVP 已通，待办按优先级推进_
+### 推进实录（2026-08-16 → 2026-08-23）
+
+_创建：2026-08-15 ｜ 状态：MVP 已通，五层架构已建成，唯一主待办 = cao-ceo Skill 真实 Micro 实战_
 - [x] 2026-08-16 **CAO Web UI 跑通**：WSL 内 vite dev server(:5173) + cao-server(:9889) 代理连通；修 3 个坑——①node_modules 用 Windows node 装的 rolldown 平台绑定不匹配 → Linux node 完整重装；②vite 进程随 WSL 会话退出被杀 → setsid 脱离会话；③Windows 侧访问走 WSL2 localhost 转发（删 portproxy 后仍通，原生转发正常）。访问 http://localhost:5173/，一键启动脚本已放 C:\path\to\your-projects\start_cao_ui.sh
 - [x] 2026-08-16 **cao-fleet skill（闭源自研）**：封装 CAO 控制面 API 召唤/管理 agent 舰队。`~/.zcode/skills/cao-fleet/`（SKILL.md + scripts/cao_fleet.sh：probe/spawn/list/status/say/out/kill）。修 3 个环境坑：①WSL 装 Linux 版 opencode（npmmirror，bin 是 ELF 只是名字带 .exe）；②auth.json 复制到 `~/.local/share/opencode/`（DeepSeek + opencode-go 两凭据）；③`/usr/local/bin/opencode` 软链压过 Windows npm shim。端到端实测：单 agent + 3 agent 舰队均真实响应（DeepSeek V4 Pro，~3-6s/task，~7.4K tokens/agent）
 - [x] 2026-08-16 **仓库可见性核对**：确认发布前仓库可见性符合预期（公开版开箱即用），历史提交扫描无真实密钥泄露
@@ -56,3 +58,21 @@ _创建：2026-08-15 ｜ 状态：MVP 已通，待办按优先级推进_
 - [x] 2026-08-16 **舰队各司其职研究 + 文档**（子 agent 源码级深挖 + mock_cli 零 token 实测）：6 个内置角色（code_supervisor 首席协调永不写码 / developer 全权执行 / reviewer 只读审核门 / memory_manager 记忆侧车 / retrospector 复盘 / workflow_scout 定位）；assign（非阻塞派活）/ handoff（阻塞接力）/ send_message（异步归集）三机制实测跑通；workflow script tier 三步流水线（研究→开发→审核）实测 completed；产出 `docs/舰队各司其职.md`（两条路线：supervisor 会话指挥 vs workflow 流水线 + 自定义 frontend/backend/researcher 角色写法 + 模型网关与分工正交说明）
 - [x] 2026-08-16 **官方做法精读对照**（子 agent 逐字读 fleet-coordinator / supervisor+worker 协议 skill / examples/assign / examples/orchestration）：官方"舰队"指跨机 CAO 节点（本机多 agent 是 supervisor/worker 协作）；核心答案=supervisor 永不写码 + 三 MCP 工具闭环 + 空闲投递纪律（派完就收手，禁止 sleep/echo 占终端）；补进文档：supervisor 铁律（任务描述落盘+绝对路径）、worker 协议（handoff 不回调/绝不拿自己 terminal_id 当 receiver_id/先写文件再报）、examples/assign 教科书示例、reviewer 裁决格式 + dev 四段式收尾、agent-routing 能力路由
 - [x] 2026-08-16 **官方 examples/assign 实战跑通**（子 agent 全流程实测，真实 token）：install 3 profiles（provider 覆盖 opencode_cli）→ POST /sessions 起 analysis_supervisor（v2.4.1 无 spawn 端点）→ 同回合 assign×3 + handoff 全秒回（非阻塞）→ 3 分析师 10s 内派发、全程并行、回传差 4s → 生成 5300 字中文报告（数值与输入一致）。≈79K in / 21K out，**≈$0.0095，4 分钟**。坑：opencode_cli 冷启动 ~60s 超 handoff 超时 → supervisor 自动降级 assign；output 端点是 tmux 屏幕捕获（ANSI 噪声），结构化记录走 SQLite。已补进 docs/舰队各司其职.md「实战验证」
+- [x] 2026-08-23 **复用 AO 的 notify+cron 实现"定点交活"（子 agent 完成）**：读 AO v0.18.0 源码确认 --notify 三出口兜底推送、域名自动适配钉钉/飞书/企微、cron=OS crontab 组合、hermes-cli provider 调 `hermes -z` 经 wrapper→本机 hermes→opencode-go 网关。实测：① --notify 真发 HTTP POST（本地监听收到通用 {text}）；②hermes-cli 链路接线 100% 正确，但网关回 401 Insufficient balance——**opencode-go 网关是预付费、额度已耗尽，并非免费**。落地：AO 定时多专家简报可复用+crontab；CAO 干事干完提醒用自建 cao_notify_poller.py（已写、推送链路实测、真实 inbox 未端到端）。交付：cao_notify_poller.py / ao_test.yaml / notify_listener.py / cao_probe.py；WSL 装 /usr/local/bin/ao v0.18.0 + 原生 Node22。（原"后台进行中"僵尸条目已删，以本完成版为准）
+- [x] 2026-08-23 **安全事件：网关 api_key 明文泄露到子 agent output 文件（已于同日闭环，见下）**：子 agent 调查 hermes 配置时脱敏正则失效，opencode-go 网关 api_key 明文落入 agent transcript（本机 ZCode 子 agent 会话 output 文件，grep 确认含 1 处 sk- 模式）。处置：①去服务商侧轮换该 key；②轮换后删除此 output 文件。与 DeepSeek/镜像远端凭据无关。
+- [x] 2026-08-23 **导入 agency-agents-zh 角色库到 CAO 舰队（子 agent 完成）**：精选 15 个角色（前端/后端架构/软件架构/DevOps/AI/数据/安全×3/代码审查/合规/产品×2/小红书/知乎），自写 convert_to_cao.sh 转 CAO opencode 格式，cao install --provider opencode_cli 导入 15/15 成功（cao profile list 共 39）。前端开发者(React计数器)+小红书运营(种草笔记) 经控制面 API 实测真出活。默认 deepseek-v4-flash 网关欠费 401，改用免费模型 opencode/hy3-free（?model= 覆盖、不改 config）旁路验证整条 pipeline 正常，成本 $0.00。交付：convert_to_cao.sh / install_cao.sh / fix_placeholders.sh + cao_profiles/*.md；CAO 控制面已常驻 127.0.0.1:9889。
+- [x] 2026-08-23 **安全事件闭环（key 已轮换 + 验证出活）**：含明文网关 key 的 3 文件（output.txt/task.output/transcript.jsonl）本地删除、grep 确认无 sk- 残留；轮换后的新 opencode-go key 已写入 WSL 两处 auth.json（/root/.aws/opencode/auth.json + /root/.local/share/opencode/auth.json，deepseek key 不变）；CAO opencode_cli worker 经新 key 成功调网关、agent 真实出活（/opt/react_answer.txt 写出 React 解释），无 401/403。旧 key 在服务商侧已失效。
+- [x] 2026-08-23 **端到端验证 poller 推送链（子 agent 完成）**：hy3-free 起 analysis_supervisor+data_analyst 两会话，POST /terminals/{id}/inbox/messages 注入 inbox 消息，跑 cao_notify_poller.py --once，本地 127.0.0.1:8899 收到两条 HTTP 200 POST（含完整 inbox 正文），成本 $0.00；CAO 会话已 DELETE 清理。目标②"跑通后自测"闭环。poller 已补 sender_id/message 字段白名单让输出更干净。（原"后台进行中"僵尸条目已删，以本完成版为准）
+- [x] 2026-08-23 **安全事件本地清零 + key 已轮换（闭环）**：含明文 key 的 3 文件本地删除、grep 确认目录无 sk- 残留；新 opencode-go key 已写入 WSL auth.json 两处并验证出活（见下条），本安全事件正式闭环。
+- [x] 2026-08-23 **新 opencode-go key 配置与网关恢复验证**：轮换后的新 key 写入 WSL 两处 auth.json；裸 urllib 直连被 Cloudflare 1010 拦截（非 key 问题），改经 CAO opencode_cli worker 实证——session cao-key_test6 起 terminal 10e434eb，agent 写出 /opt/react_answer.txt（React 解释），无 401/403。网关访问恢复。
+- [x] 2026-08-23 **成果入库推送**：30 文件 commit（agency-roles/ 15 角色+转换脚本+上游 MIT LICENSE+NOTICE 派生声明、cao_notify_poller.py、AO notify 验证脚本、评估文档）；镜像远程推送成功；GitHub 侧随后补推。
+- [x] 2026-08-23 **275 角色价值评估（两份报告）**：`docs/agency-roles-evaluation.md`（推荐精选扩充至~45，剔除重复）+ `docs/prompt-quality-review.md`（12 角色纯读提示词评审）：结论=部分有用——合同审查(12)/HR招聘(12)/小红书(11)/Outbound销售(11)/产品经理(11)/财务分析(11) 是真本土化精品可直接入队；工程/测试/客服类是翻译填充套壳件(6-7分)不值得。策略：挑 8-10 个精品纳编，别被数量唬住。
+- [x] 2026-08-23 **新装 6 个新领域 CAO profile**：UX 架构师/增长黑客/财务分析师/合同审查专家/API 测试员/Outbound 策略师（CAO agents 目录 19→25）。注：API 测试员经评审偏弱可移除；HR 招聘(12 分)尚未装。
+- [x] 2026-08-23 **清理与止损**：删 CAO 残留测试 session（key_test2/3/4）；按董事长反馈停止高成本逐角色 spawn 实测（费 token 且慢），改为纯读提示词评审（零网关消耗）。
+- [ ] 2026-08-23 **舰队定编 + 真实多角色实战**（待董事长看完报告拍板）：装 HR 招聘、删花架子（API 测试员），然后 3-4 个精品角色跑一场小型真实任务实战，验证「各司其职+干完自动回报」整条链路；全程控制 token 量级。
+- [x] 2026-08-23 **开源格局研究 + 架构蓝图**：搜同类项目（原版 agency-agents 147k★纯英文/VoltAgent 158+开发向/ChatDev/MetaGPT 不指挥CLI/agency-orchestrator 零代码YAML入口）；确认人才库锁定 agency-agents-zh 一家足够（原版翻译+52中国原创+NEXUS组织手册）；发现 strategy/ 目录 NEXUS 组织手册=愿景"组织设计空白"的现成答案。产出：docs/达成目标架构蓝图.md（五层架构：意图/组织/人才/执行/保障）+ docs/agency-agents-人才库与组织手册对接.md
+- [x] 2026-08-23 **CEO Playbook v0 + cao-ceo Skill**：NEXUS 落成可执行手册（docs/CEO-Playbook-v0.md，5步标准动作/三编制/七阶段/质量门禁/NEXUS交接模板）；包装成 skills/cao-ceo/SKILL.md（复用 cao-fleet 脚本、召唤时自动注入知识源 docs/+FENGMEM.md、验收 spawn reviewer 打分、审批在回路直接问董事长）。校验 playbook 引用 profile 全部存在
+- [x] 2026-08-23 **人才库全量导入 263 profile**：董事长指示"没资格评判小众、全部装上"——作废上一版剔除方案（convert_all_to_cao.sh），重写 convert_all_full.sh 全量扫 19 部门 260 角色零剔除导入；游戏5/GIS13/学术6/空间计算6/C-level/垂直行业 100% 进来；86 个标【在编】核心（仅标记不影响可召唤性）；agent-store 共 263（含 CAO 原有3）；同步仓库 agency-roles/cao_profiles/263；MIT 署名随后于同日全量修复（见下条）
+- [x] 2026-08-23 **保障层拆穿（过度设计纠正）**：之前推荐的 5 个独立保障工具中 4 个多余——审批门=Code 在回路直接问（不引 AgentGate）、记忆=Code原生+FENGMEM（不引 MemPalace）、通知=cao_notify_poller 已有（不引钉钉框架）、验收=spawn reviewer agent（不引 promptfoo）；唯一真缺口=知识供给，已由 cao-ceo skill 召唤时自动注入 docs/+FENGMEM.md 解决（不引 RAGFlow）
+- [x] 2026-08-23 **FENGMEM.md 会话记忆建立**：按全局规则建立项目根会话记忆文件 FENGMEM.md，7 轮全程记录（评估→架构→全量导入→Skill 化）
+- [x] 2026-08-23 **MIT 署名合规全量修复**：convert_all_full.sh 内置署名逻辑（正文顶部嵌上游仓库链接+双版权+派生说明）→ 重新生成 WSL agent-store 260 个 → 同步仓库 cao_profiles/ → 双侧 python 验证 260/260 零缺失；NOTICE.md 更新为全量口径；导入清单.md 合规项转已修复。合规债清零

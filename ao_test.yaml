@@ -1,0 +1,9 @@
+name: "AO-reuse-test-single-step"
+description: "Verify hermes-cli provider invocation and --notify push"
+agents_dir: "/usr/local/lib/node_modules/agency-orchestrator/agency-agents"
+concurrency: 1
+steps:
+  - id: step1
+    role: "engineering/engineering-code-reviewer"
+    task: "Answer in one sentence: what is multi-agent orchestration?"
+    output: result1
