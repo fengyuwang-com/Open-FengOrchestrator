@@ -19,7 +19,7 @@ MCP（Model Context Protocol，模型上下文协议）是 Anthropic 于 2024 �
 
 ## 二、对"干事舰队"的价值
 
-本项目（Open-FengOrchestrator）的定位是"干事舰队"——一批可编排的自动化干事。MCP 给每个干事挂载外部能力提供了一条标准通道：
+本项目（FengOrchestrator）的定位是"干事舰队"——一批可编排的自动化干事。MCP 给每个干事挂载外部能力提供了一条标准通道：
 
 | 干事场景 | 可用 MCP server（举例） | 效果 |
 |---|---|---|
@@ -52,7 +52,7 @@ MCP（Model Context Protocol，模型上下文协议）是 Anthropic 于 2024 �
 mcp_servers:
   filesystem:
     command: "npx"                                   # 必填：可执行程序
-    args: ["-y", "@modelcontextprotocol/server-filesystem", "C:/path/to/your-projects/FengOrchestrator"]  # 可选：参数
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "~/FengOrchestrator"]  # 可选：参数
     env:                                             # 可选：只把这些环境变量传给子进程
       SOME_VAR: "value"
     timeout: 120                                     # 可选：单次工具调用超时（秒），默认 120
@@ -105,11 +105,11 @@ hermes mcp install <name># 一键安装目录里的 MCP（如 n8n、linear）
 mcp_servers:
   filesystem:
     command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-filesystem", "C:/path/to/your-projects/FengOrchestrator"]
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "~/FengOrchestrator"]
     connect_timeout: 120
 ```
 
-server 名 `filesystem`，root 目录限定为 `C:/path/to/your-projects/FengOrchestrator`（安全沙箱：server 只能访问该目录，防越权读写）。
+server 名 `filesystem`，root 目录限定为 `~/FengOrchestrator`（安全沙箱：server 只能访问该目录，防越权读写）。
 
 ### 4.2 验证 1：`hermes mcp list` / `hermes mcp test filesystem`
 
@@ -153,10 +153,10 @@ mcp__filesystem__write_file
 
 ### 4.4 验证 3：实际调用 MCP 工具（端到端）
 
-命令：`hermes -z "用 MCP filesystem 工具列出 C:/path/to/your-projects/FengOrchestrator 的顶层目录内容…"`，Agent 实际调用了 MCP 工具并返回：
+命令：`hermes -z "用 MCP filesystem 工具列出 ~/FengOrchestrator 的顶层目录内容…"`，Agent 实际调用了 MCP 工具并返回：
 
 ```
-项目根目录 C:\path\to\your-projects\FengOrchestrator 的顶层内容如下：
+项目根目录 ~/FengOrchestrator 的顶层内容如下：
 
 文件（4 个）:
   .gitignore   372 B    Git 忽略规则
@@ -195,5 +195,5 @@ mcp__filesystem__write_file
 
 - `~/AppData/Local/hermes/config.yaml` — 新增 `mcp_servers.filesystem` 段（其余未动）
 - `~/AppData/Local/hermes/config.yaml.bak-mcp-20260815235303` — 修改前备份
-- `C:\path\to\your-projects\FengOrchestrator\docs\mcp.md` — 本报告
+- `~/FengOrchestrator/docs/mcp.md` — 本报告
 - 未触碰：provider / api_key（Zen key）相关配置；未写入任何密钥。

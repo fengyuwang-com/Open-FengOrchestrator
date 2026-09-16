@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FengOS — System Overview</title>
+<style>
+/* ============================================================
+   FengOS · Apple Liquid Glass Edition (light)
+   全部颜色/圆角/阴影取自 design-refs/naplesblue/tokens.css，
+   一律 var(--…) 引用；玻璃只给粘性 Dock 与 tooltip 浮层。
+   ============================================================ */
+:root{
+  /* —— 中性骨架（tokens.css） —— */
+  --bg:#f5f5f7;
+  --surface:#ffffff;
+  --hover:#fbfbfd;
+  --text:#1d1d1f;
+  --text-body:#424245;
+  --text-2:#6e6e73;
+  --text-3:#86868b;
+  --text-4:#aeaeb2;
+  --faint:#d2d2d7;
+  --hairline:rgba(0,0,0,.07);
+  /* —— 唯一强调色 —— */
+  --accent:#0071e3;
+  --accent-link:#0066cc;
+  --live:#30d158;
+  --track:#e8e8ed;
+  /* —— 圆角层级 —— */
+  --r-pill:999px;
+  --r-card:18px;
+  --r-panel:22px;
+  --r-hero:26px;
+  /* —— 阴影（双层） —— */
+  --sh-card:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05);
+  --sh-panel:0 1px 3px rgba(0,0,0,.05),0 14px 40px rgba(0,0,0,.05);
+  --sh-overlay:0 2px 8px rgba(0,0,0,.10),0 30px 80px rgba(0,0,0,.24);
+  /* —— 动效 —— */
+  --ease-spring:cubic-bezier(.32,.72,0,1);
+  --ease-out-quart:cubic-bezier(.25,1,.5,1);
+  /* —— 版式 —— */
+  --max-read:720px;
+  --max-grid:1080px;
+  --pad-x:22px;
+  --fs-hero:clamp(40px,6vw,64px);
+  --fs-h2:clamp(27px,4vw,40px);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);color:var(--text);
+  background:var(--bg);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  font-optical-sizing:auto;
+  line-height:1.6;
+  overflow-x:hidden;
+}
+/* ============ 彩色毛玻璃光斑背景（fixed，藏在内容后） ============ */
+.aurora{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.aurora i{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;will-change:transform}
+.aurora i:nth-child(1){width:560px;height:560px;left:-140px;top:-120px;
+  background:radial-gradient(circle,rgba(10,132,255,.38),transparent 70%)}
+.aurora i:nth-child(2){width:640px;height:640px;right:-180px;top:8%;
+  background:radial-gradient(circle,rgba(94,92,230,.30),transparent 70%)}
+.aurora i:nth-child(3){width:520px;height:520px;left:12%;top:46%;
+  background:radial-gradient(circle,rgba(48,209,88,.22),transparent 70%)}
+.aurora i:nth-child(4){width:600px;height:600px;right:6%;bottom:-160px;
+  background:radial-gradient(circle,rgba(255,159,10,.24),transparent 70%)}
+.aurora i:nth-child(5){width:480px;height:480px;left:-100px;bottom:-80px;
+  background:radial-gradient(circle,rgba(255,55,95,.18),transparent 70%)}
+/* 缓慢漂移；reduced-motion 用户静止 */
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.06)}66%{transform:translate(-30px,26px) scale(.96)}}
+.aurora i{animation:drift 26s ease-in-out infinite}
+.aurora i:nth-child(2){animation-duration:34s;animation-direction:reverse}
+.aurora i:nth-child(3){animation-duration:42s}
+.aurora i:nth-child(4){animation-duration:30s;animation-direction:reverse}
+.aurora i:nth-child(5){animation-duration:38s}
+/* ============ 鼠标跟随光晕（彩色柔和光，pointer:fine 才启用） ============ */
+.glow{position:fixed;left:0;top:0;width:520px;height:520px;z-index:0;pointer-events:none;
+  border-radius:50%;transform:translate(-50%,-50%);opacity:0;transition:opacity .5s;
+  background:radial-gradient(circle,rgba(10,132,255,.10),rgba(94,92,230,.06) 40%,transparent 70%);
+  filter:blur(20px)}
+body.has-glow .glow{opacity:1}
+@media (prefers-reduced-motion:reduce){.aurora i{animation:none}}
+main{max-width:var(--max-grid);margin:0 auto;padding:0 var(--pad-x) 150px}
+section{scroll-margin-top:28px}
+
+/* ============ 统一面板：半透明白 + 毛玻璃，彩色光斑可透出 ============ */
+.panel{background:rgba(255,255,255,.72);border-radius:var(--r-panel);
+  -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+  border:1px solid rgba(255,255,255,.55);
+  box-shadow:var(--sh-panel);overflow:hidden}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .panel{background:var(--surface)}
+}
+
+/* ============ 底部 Dock：唯一玻璃层（glass-nav 配方） ============ */
+.tabbar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:50;
+  display:flex;gap:2px;align-items:center;padding:6px 8px;border-radius:var(--r-pill);
+  background:rgba(245,245,247,.72);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  backdrop-filter:saturate(180%) blur(20px);
+  border:1px solid var(--hairline);
+  box-shadow:var(--sh-card);
+  transition:transform .3s var(--ease-out-quart),box-shadow .3s;}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .tabbar{background:var(--surface)}
+}
+.tabbar.scrolled{transform:translateX(-50%) scale(.96);box-shadow:var(--sh-overlay)}
+.tabbar a{position:relative;display:block;min-height:36px;padding:9px 16px;border-radius:var(--r-pill);
+  text-decoration:none;font-size:14px;font-weight:500;color:var(--text-2);
+  transition:color .2s var(--ease-out-quart),background .2s var(--ease-out-quart),transform .3s var(--ease-out-quart);}
+.tabbar a:hover{color:var(--text)}
+.tabbar a.on{color:var(--text);background:var(--surface);font-weight:600;
+  box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.tabbar button{border:0;background:rgba(0,0,0,.05);color:var(--text-2);cursor:pointer;
+  font:500 13px/1 var(--font);min-height:36px;padding:9px 14px;border-radius:var(--r-pill);margin-left:6px;
+  transition:transform .3s var(--ease-out-quart),background .2s,color .2s;}
+.tabbar button:hover{color:var(--text);background:rgba(0,0,0,.08)}
+.tabbar button:active{transform:scale(.94)}
+/* 窄屏胶囊：单行绝不多行、任何宽度不竖排——放不下就横向滑动，滚动条隐藏 */
+@media (max-width:700px){
+  .tabbar{max-width:calc(100vw - 16px);flex-wrap:nowrap;overflow-x:auto;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none;padding:5px 6px;gap:1px}
+  .tabbar::-webkit-scrollbar{display:none}
+  .tabbar a,.tabbar button{flex:none;padding:6px 8px;font-size:11px;
+    white-space:nowrap;letter-spacing:0;writing-mode:horizontal-tb}
+  .tabbar button{margin-left:2px}
+}
+
+/* ============ Hero ============ */
+.hero{padding:clamp(36px,6vw,64px) 8px clamp(20px,4vw,32px)}
+.eyebrow{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:600;
+  letter-spacing:.14em;color:var(--text-3)}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--live);
+  animation:pulse-dot 2.2s infinite;flex:none}
+@keyframes pulse-dot{
+  0%{box-shadow:0 0 0 0 rgba(48,209,88,.5)}
+  70%{box-shadow:0 0 0 7px rgba(48,209,88,0)}
+  100%{box-shadow:0 0 0 0 rgba(48,209,88,0)}}
+.hero h1{margin-top:15px;font-size:var(--fs-hero);font-weight:700;letter-spacing:-.03em;line-height:1.08}
+.hero h1 span[data-i18n="heroA"]{display:block}
+.hero h1 .accent{color:var(--accent)}
+.hero p.sub{margin-top:16px;font-size:clamp(15px,2.5vw,18px);color:var(--text-2);line-height:1.7;max-width:560px}
+
+/* ---- KPI：纯排版网格，tabular-nums，无卡片壳 ---- */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);margin:clamp(40px,6vw,72px) 0 12px}
+@media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr);row-gap:36px}}
+.kpi{text-align:left;padding:0 28px;border-left:1px solid var(--hairline)}
+.kpi:first-child{border-left:0;padding-left:0}
+.kpi .num{font-size:clamp(44px,5vw,68px);font-weight:600;letter-spacing:-.025em;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--text)}
+.kpi .num small{font-size:.5em;font-weight:500}
+.kpi .lab{margin-top:12px;font-size:15px;color:var(--text-2)}
+@media (max-width:640px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:26px;margin-top:34px}
+  .kpi:nth-child(odd){border-left:0;padding-left:0}
+  .kpi{padding:0 12px 0 0;text-align:left;min-width:0;overflow:visible}
+  .kpi:nth-child(even){border-left:1px solid var(--hairline);padding-left:12px}
+  .kpi .num{font-size:30px;letter-spacing:-.02em;white-space:nowrap;overflow:visible;text-overflow:clip}
+  .kpi .num small{font-size:.45em}
+  .kpi .lab{font-size:12px;margin-top:8px}
+}
+
+/* ============ 通用区块 ============ */
+.block{margin-top:clamp(34px,6vw,56px)}
+@media (max-width:640px){.block{margin-top:clamp(34px,6vw,56px)}}
+.sechead{margin:0 6px 26px}
+.sechead h2{font-size:var(--fs-h2);font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.sechead .hint{font-size:15px;color:var(--text-3);margin-top:8px;line-height:1.6}
+.pdca{margin:0 6px 4px;font-size:13.5px;color:var(--text-2);line-height:1.7}
+
+/* ============ 星图画布（浅色：深色节点 + 灰阶/蓝色边线） ============ */
+.galaxy-wrap{padding:10px}
+#galaxy{display:block;width:100%;height:540px;border-radius:var(--r-card);cursor:crosshair}
+@media (max-width:640px){#galaxy{height:420px}}
+.galaxy-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px;padding:2px 10px 12px;font-size:12px;color:var(--text-3);line-height:1.6}
+.galaxy-legend b{color:var(--text-2);font-weight:550}
+/* tooltip：浮层，允许玻璃 */
+#tip{position:fixed;z-index:60;pointer-events:none;opacity:0;transition:opacity .15s;
+  padding:10px 14px;border-radius:var(--r-card);font-size:13px;line-height:1.55;color:var(--text);
+  background:rgba(245,245,247,.72);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border:1px solid var(--hairline);box-shadow:var(--sh-overlay);}
+#tip b{color:var(--accent-link)}
+#tip .muted{color:var(--text-2)}
+
+/* ---- 语言构成条：蓝阶 + 灰（灰阶世界，唯一强调色蓝） ---- */
+.langbar{margin-top:14px;padding:20px 24px}
+.langbar .row{display:flex;height:12px;border-radius:var(--r-pill);overflow:hidden;background:var(--track)}
+.langbar .seg{height:100%;transition:width 1s var(--ease-spring)}
+.langbar .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:14px;font-size:12px;color:var(--text-2)}
+.langbar .legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+
+/* ============ 服务：单列统一面板列表 ============ */
+.svcs{display:flex;flex-direction:column}
+/* 同一区块内面板纵向分层：杜绝上下贴死 */
+.block .panel + .panel{margin-top:18px}
+@media (max-width:640px){.block .panel + .panel{margin-top:14px}}
+.svc{display:flex;align-items:center;gap:18px;padding:20px clamp(17px,3vw,24px);flex-wrap:wrap;
+  min-height:44px}
+.svc+.svc{border-top:1px solid var(--hairline)}
+.svc .sname{display:flex;align-items:center;gap:10px;min-width:170px}
+.svc .name{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.svc .dot{width:9px;height:9px;border-radius:50%;background:var(--faint);flex:none}
+.svc .dot.on{background:var(--live);animation:pulse-dot 2.2s infinite}
+.svc .sdesc{font-size:13.5px;color:var(--text-2);line-height:1.5;flex:1;min-width:200px}
+.svc .ts{font-size:12px;color:var(--text-3);direction:ltr;word-break:break-all;font-variant-numeric:tabular-nums}
+.svc .lead{flex:1;min-width:20px;border-bottom:1px solid var(--hairline);align-self:center;height:1px}
+.svc .stop-h{display:flex;align-items:center;gap:12px;margin-left:auto}
+.btn{border:0;cursor:pointer;font:550 13.5px/1 var(--font);min-height:44px;padding:0 20px;
+  border-radius:var(--r-pill);letter-spacing:0;
+  transition:transform .2s var(--ease-out-quart),background .15s,color .15s,box-shadow .2s;}
+.btn:active{transform:scale(.94)}
+.btn.start{background:var(--accent);color:#fff}
+.btn.start:hover{background:var(--accent-link)}
+.btn.stop{background:var(--surface);color:var(--text);
+  border:1px solid rgba(0,0,0,.08);box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.btn.stop:hover{background:var(--hover)}
+.btn[disabled]{opacity:.45;cursor:default}
+.btn.busy{animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.svc a.open{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;
+  font-size:22px;font-weight:500;color:var(--text-3);text-decoration:none;line-height:1}
+.svc a.open:hover{color:var(--accent)}
+.svc .msg{font-size:12px;color:var(--text-3);direction:ltr;opacity:0;transition:opacity .5s}
+.svc .msg.show{opacity:1}
+@media (max-width:900px){
+  .svc{gap:8px 14px}
+  .svc .lead{display:none}
+  .svc .ts{display:none}
+  .svc .stop-h{margin-left:0;width:100%;justify-content:flex-end}
+}
+/* ---- 窄屏自动化能力名不断字不断行（390px：名称独占一行 nowrap，描述另起整行，页无横向溢出） ---- */
+@media (max-width:640px){
+  .svc{gap:10px 12px;padding:16px clamp(14px,4vw,17px)}
+  .svc .sname{min-width:0;flex:1 1 auto;max-width:100%}
+  .svc .name{font-size:14.5px;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .svc .sdesc{flex-basis:100%;min-width:0}
+}
+
+/* ============ 自动化：层标题（panel 内分组小标题，沿用 token） ============ */
+.layer{padding:18px clamp(17px,3vw,24px) 2px;font-size:12.5px;font-weight:600;
+  letter-spacing:.1em;color:var(--text-3)}
+#autoBody .panel{margin-bottom:0}
+#autoBody .panel:last-child{margin-bottom:0}
+/* ---- 四层流向：层间箭头（纵向流，复用 token，不另起视觉） ---- */
+.flow{display:flex;justify-content:center;padding:10px 0 12px}
+.farr{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;
+  border-radius:50%;border:1px solid var(--hairline);background:var(--surface);
+  color:var(--accent);font-size:15px;line-height:1;box-shadow:var(--sh-card)}
+/* ---- RESEARCH diagram: sources to capabilities to stored (tokens only) ---- */
+.rsch-wrap{padding:16px clamp(17px,3vw,24px) 10px;overflow:hidden;max-width:100%}
+.rsch-sub{font-size:12.5px;color:var(--text-3);text-align:center;line-height:1.7;max-width:100%;overflow-wrap:anywhere}
+.rsch-diagram{display:grid;grid-template-columns:minmax(0,1.3fr) 54px minmax(0,1fr) 54px minmax(0,1fr);gap:10px;align-items:stretch;margin-top:14px;max-width:100%}
+.rsch-stage{display:flex;flex-direction:column;gap:8px;min-width:0}
+.rsch-stitle{font-size:12.5px;font-weight:600;letter-spacing:.1em;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rsch-nodes{display:flex;flex-direction:column;gap:8px;min-width:0}
+.rsch-node{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-card);box-shadow:var(--sh-card);padding:10px 12px;min-width:0;overflow:hidden}
+.rsch-node b{display:block;font-size:13px;font-weight:600;letter-spacing:-.01em;overflow-wrap:anywhere}
+.rsch-node span{display:block;margin-top:4px;font-size:12px;color:var(--text-2);line-height:1.55;overflow-wrap:anywhere}
+.rsch-node .rsch-num{color:var(--accent-link);font-weight:600;font-variant-numeric:tabular-nums;direction:ltr}
+.rsch-note{margin-top:12px;font-size:12.5px;color:var(--text-3);line-height:1.6;text-align:center;max-width:100%}
+.rsch-link{display:flex;align-items:center;justify-content:center;min-width:0}
+.rsch-link svg{display:block;width:100%;max-width:54px;height:24px;overflow:visible}
+.rsch-line{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 6;animation:rsch-flow 1.1s linear infinite}
+@keyframes rsch-flow{to{stroke-dashoffset:-12}}
+.rsch-diagram.still .rsch-line{animation:none}
+@media (max-width:760px){.rsch-diagram{grid-template-columns:minmax(0,1fr)}.rsch-link{min-height:30px}.rsch-link svg{width:24px;height:32px;transform:rotate(90deg)}}
+@media (prefers-reduced-motion:reduce){.rsch-line{animation:none}}
+/* ---- 思考组专属样式 ---- */
+.think-box{padding:16px clamp(17px,3vw,24px);max-width:100%;overflow:hidden}
+.think-line{font-size:13.5px;color:var(--text-body);line-height:1.6;max-width:100%}
+.think-flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;max-width:100%}
+.think-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+  margin-top:12px;max-width:100%}
+.think-card{min-width:0;overflow:hidden;background:var(--surface);
+  border:1px solid var(--hairline);border-radius:var(--r-card);
+  padding:12px 14px 10px;box-shadow:var(--sh-card)}
+.think-card .tk-name{font-size:14px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.think-card .tk-desc{margin-top:4px;font-size:12px;color:var(--text-2);
+  line-height:1.55;overflow-wrap:anywhere}
+.think-card .tk-stat{margin-top:6px;font-size:12px;color:var(--accent-link);
+  font-variant-numeric:tabular-nums;direction:ltr;overflow-wrap:anywhere}
+.think-stat{margin-top:10px;font-size:12.5px;color:var(--text-3);
+  font-variant-numeric:tabular-nums;direction:ltr}
+.think-note{margin-top:10px;font-size:12px;color:var(--text-3);line-height:1.6;max-width:100%}
+@media (max-width:640px){
+  .think-cards{grid-template-columns:minmax(0,1fr)}
+  .think-flow .pnode{font-size:12px;padding:7px 11px}
+}
+/* ---- 创作：六类生成能力动态小图（复用 token；窄屏不溢出） ---- */
+.gen-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;
+  padding:14px clamp(17px,3vw,24px) 6px}
+.gcard{min-width:0;overflow:hidden;background:var(--surface);
+  border:1px solid var(--hairline);border-radius:var(--r-card);
+  padding:12px 14px 10px;box-shadow:var(--sh-card)}
+.gcard .gn{font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.gcard .gen{font-size:11.5px;color:var(--text-3);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.gcard .gd{font-size:12px;color:var(--text-2);line-height:1.55;margin-top:4px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gcard .gs{margin-top:6px;font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gcard .flowline{position:relative;height:3px;border-radius:var(--r-pill);
+  background:var(--track);margin-top:8px;overflow:hidden}
+.gcard .flowline i{position:absolute;top:0;bottom:0;width:34%;border-radius:var(--r-pill);
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  animation:gflow 2.6s linear infinite}
+@keyframes gflow{from{left:-34%}to{left:100%}}
+@media (max-width:900px){.gen-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.gen-grid{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){.gcard .flowline i{animation:none;left:0;width:100%;opacity:.35}}
+/* ---- 创作组专属样式 ---- */
+.create-def{padding:14px clamp(17px,3vw,24px) 2px;max-width:100%}
+.cr-def-main{display:block;font-size:13.5px;line-height:1.6;color:var(--text-body);
+  font-weight:700;letter-spacing:-.01em}
+.cr-def-kicker{display:inline-block;margin-right:8px;font-size:11px;font-weight:700;
+  letter-spacing:.12em;color:var(--accent);text-transform:uppercase;vertical-align:1px}
+.cr-def-en{display:block;margin-top:2px;padding-left:13px;font-size:12px;font-weight:400;
+  color:var(--text-3);line-height:1.55}
+.gcard.cr-lead{grid-column:1/-1;border-color:rgba(0,113,227,.3)}
+@media (max-width:900px){.gcard.cr-lead{grid-column:1/-1}}
+@media (max-width:640px){.gcard.cr-lead{grid-column:auto}}
+/* ---- 行动组专属样式 ---- */
+.act-def{padding:14px clamp(17px,3vw,24px) 2px;max-width:100%}
+.act-def-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;
+  padding:9px 14px;max-width:100%;background:var(--surface);
+  border:1px solid var(--hairline);border-radius:var(--r-card);
+  box-shadow:var(--sh-card);font-weight:700;font-size:13px;
+  color:var(--accent);letter-spacing:-.01em}
+.act-def-line .enw{font-weight:500;font-size:12px;color:var(--text-2);
+  direction:ltr;letter-spacing:0}
+@media (max-width:640px){.act-def{padding-left:12px;padding-right:12px}.act-def-line{gap:4px 10px;padding:8px 12px}}
+/* ---- 自我改进环：五段真圆环 SVG + 外圈 MD 宪法（白底发丝线，唯一蓝） ---- */
+.pdca-box{padding:16px clamp(17px,3vw,24px);margin:10px 0 6px;max-width:100%;overflow:hidden}
+.pdca-ring-title{font-size:15px;font-weight:700;letter-spacing:-.01em;text-align:center;max-width:100%}
+.pdca-sub{margin-top:4px;font-size:12.5px;color:var(--text-3);text-align:center;line-height:1.6;max-width:100%}
+.pdca-wrap{display:flex;gap:18px;align-items:center;justify-content:center;margin-top:12px;flex-wrap:wrap;max-width:100%}
+.pdca-ring{width:min(300px,100%);max-width:100%;flex:none}
+.pdca-ring svg{display:block;width:100%;height:auto;max-width:100%}
+.ring-flow{transform-box:fill-box;transform-origin:center;animation:ring-spin 26s linear infinite}
+@keyframes ring-spin{to{transform:rotate(360deg)}}
+.ring-label{font-family:var(--font);font-weight:600;writing-mode:horizontal-tb;white-space:nowrap}
+.ring-center{font-family:var(--font);writing-mode:horizontal-tb;white-space:nowrap}
+.md-const{flex:1;min-width:220px;min-width:min(220px,100%);max-width:100%}
+.md-cap{font-size:12.5px;font-weight:700;letter-spacing:.06em;color:var(--text-2);text-align:left}
+.md-pills{margin-top:8px;display:flex;flex-wrap:wrap;justify-content:flex-start;max-width:100%}
+.md-pill{display:inline-flex;align-items:center;max-width:100%;
+  padding:6px 12px;margin:3px;border-radius:var(--r-pill);background:var(--surface);
+  border:1px solid var(--hairline);font-size:12.5px;font-weight:600;
+  white-space:nowrap;writing-mode:horizontal-tb;word-break:keep-all}
+.md-note{margin-top:8px;font-size:12.5px;color:var(--text-2);line-height:1.6;max-width:100%}
+@media (max-width:640px){
+  .pdca-wrap{gap:12px}
+  .pdca-ring{width:min(240px,100%)}
+  .pdca-ring-title{font-size:13.5px}
+  .md-cap{text-align:center}
+  .md-pills{justify-content:center}
+  .md-note{text-align:center}
+}
+@media (prefers-reduced-motion:reduce){.ring-flow{animation:none}}
+.pnode{display:inline-flex;align-items:center;min-width:0;max-width:100%;
+  padding:8px 14px;border-radius:var(--r-pill);background:var(--surface);
+  border:1px solid var(--hairline);font-size:13px;font-weight:600;letter-spacing:-.01em;
+  white-space:nowrap;writing-mode:horizontal-tb;word-break:keep-all}
+.parr{color:var(--accent);font-size:14px;font-weight:600;flex:none}
+/* ---- 自我改进组专属样式 ---- */
+.si-loop{padding:16px clamp(17px,3vw,24px) 14px;max-width:100%;overflow:hidden}
+.si-quote{max-width:100%;font-size:13.5px;font-weight:600;line-height:1.65;
+  letter-spacing:-.01em;border-top:2px solid var(--accent);padding:8px 0 0 0}
+.si-steps{margin-top:12px;display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;max-width:100%}
+.si-step{display:inline-flex;flex-direction:column;gap:3px;min-width:0;max-width:100%;
+  padding:8px 14px;border-radius:var(--r-pill);background:var(--surface);
+  border:1px solid var(--hairline)}
+.si-step b{font-size:12.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+.si-step span{font-size:11.5px;color:var(--text-2);line-height:1.45;
+  overflow-wrap:anywhere}
+.si-arr{flex:none;color:var(--accent);font-size:14px;font-weight:600;align-self:center}
+@media (max-width:640px){
+  .si-step{flex:1 1 100%;border-radius:var(--r-card)}
+  .si-arr{transform:rotate(90deg)}
+  .si-quote{padding:6px 0 0 0}
+}
+/* ---- paper 三元总图：L1/L2 上下两条大带，文档治理面一根纵向色带穿透两层 ---- */
+.triad{padding:18px clamp(17px,3vw,24px);max-width:100%;overflow:hidden}
+.tri-canvas{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 200px;
+  grid-template-rows:auto auto auto;column-gap:12px;max-width:100%}
+.tri-l1{grid-column:1/3;grid-row:1}
+.tri-iface{grid-column:1/3;grid-row:2}
+.tri-l2{grid-column:1/3;grid-row:3}
+.tri-l1,.tri-l2{border:1px solid var(--hairline);border-radius:var(--r-card);
+  background:var(--surface);box-shadow:var(--sh-card);padding:14px 216px 14px 16px;min-width:0}
+.tri-lhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;max-width:100%}
+.tri-tag1{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:var(--text-3);white-space:nowrap}
+.tri-ln{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.tri-ld{font-size:12.5px;color:var(--text-2);line-height:1.55;min-width:0}
+.tri-row{display:flex;align-items:stretch;margin-top:10px;max-width:100%}
+.tri-node{flex:1 1 0;min-width:0;background:var(--hover);border:1px solid var(--hairline);
+  border-radius:var(--r-card);padding:10px 8px;text-align:center}
+.tri-node .tri-name{font-size:13.5px;font-weight:700;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tri-node .tri-note{margin-top:4px;font-size:11.5px;color:var(--text-2);line-height:1.5;overflow-wrap:anywhere}
+.tri-node.tri-ai{border-color:rgba(0,113,227,.35)}
+.tri-link{flex:0 0 92px;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 2px}
+.tri-lab{font-size:10.5px;color:var(--text-3);text-align:center;line-height:1.35}
+.tri-link svg{display:block;width:100%;height:14px;overflow:visible}
+.tri-line{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 5;animation:tri-dash 1.1s linear infinite}
+.tri-line.up{stroke:var(--live)}
+.tri-head{fill:var(--accent)}
+.tri-head.up{fill:var(--live)}
+@keyframes tri-dash{to{stroke-dashoffset:-11}}
+.tri-iface{display:flex;justify-content:center;gap:18px;padding:8px 216px 8px 0;flex-wrap:wrap;max-width:100%}
+.tri-iface .if-item{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.tri-iface .if-lab{font-size:11.5px;color:var(--text-2);line-height:1.4}
+.tri-iface svg{flex:none;width:14px;height:24px;overflow:visible}
+.tri-note2{margin-top:8px;font-size:12px;color:var(--text-2);line-height:1.6}
+/* 纵向文档治理面：半透明色带叠在 L1/L2 右侧之上，中线流动示意"穿透" */
+.tri-plane{grid-column:2;grid-row:1/4;z-index:2;position:relative;min-width:0;overflow:hidden;
+  display:flex;flex-direction:column;gap:10px;
+  border:1px solid rgba(0,113,227,.28);border-radius:var(--r-card);
+  background:linear-gradient(180deg,rgba(0,113,227,.07),rgba(0,113,227,.04));
+  padding:14px 12px 14px 18px}
+.tri-plane::before{content:"";position:absolute;left:6px;top:0;bottom:0;width:2px;
+  background-image:linear-gradient(180deg,var(--accent) 0 7px,transparent 7px 13px);
+  background-size:2px 13px;background-repeat:repeat-y;
+  animation:plane-flow 1.1s linear infinite;opacity:.55}
+@keyframes plane-flow{to{background-position:0 13px}}
+.tri-plane-t{font-size:13px;font-weight:700;letter-spacing:-.01em;text-align:center}
+.tri-plane-s{font-size:11px;color:var(--text-3);text-align:center;line-height:1.5}
+.tri-junc{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tri-junc-tag{font-size:10.5px;font-weight:700;letter-spacing:.1em;color:var(--text-3);white-space:nowrap}
+.tri-jrow{display:flex;align-items:center;gap:7px;min-width:0}
+.tri-jrow svg{flex:none;width:12px;height:22px;overflow:visible}
+.tri-jrow .jlab{font-size:11px;color:var(--text-2);line-height:1.45;min-width:0;overflow-wrap:anywhere}
+.tri-md{display:flex;flex-direction:column;align-items:stretch;margin:auto 0;min-width:0}
+.tri-md .md-pill{margin:3px 0;justify-content:center;max-width:100%;font-size:11.5px;padding:5px 10px}
+.tri-foot{margin-top:14px;padding-top:12px;border-top:1px solid var(--hairline);
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;max-width:100%}
+.tri-tagline{margin-top:10px;text-align:center;font-size:13.5px;line-height:1.6;color:var(--text)}
+.tri-cases{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px 10px;justify-content:center;
+  align-items:center;font-size:12px;color:var(--text-2);max-width:100%}
+.tri-cases .cn{font-weight:600;color:var(--text)}
+.tri-cases .sep{color:var(--text-4)}
+/* 窄屏：文档面转顶部横条，L1/L2 竖列；三块共用顶部蓝线，保持"穿过"两层的穿透关系 */
+@media (max-width:1020px){
+  .tri-canvas{display:flex;flex-direction:column;gap:10px}
+  .tri-plane{order:-1;border-top:3px solid rgba(0,113,227,.4)}
+  .tri-plane::before{display:none}
+  .tri-l1,.tri-l2{padding:14px 16px;border-top:3px solid rgba(0,113,227,.4)}
+  .tri-iface{padding:8px 0}
+  .tri-md{flex-direction:row;flex-wrap:wrap;justify-content:flex-start}
+  .tri-md .md-pill{margin:3px}
+}
+@media (max-width:640px){
+  .tri-row{flex-direction:column}
+  .tri-link{flex-direction:row;justify-content:center;align-items:center;gap:8px;padding:6px 0;flex-basis:auto}
+  .tri-link svg{width:30px;height:14px;transform:rotate(90deg);flex:none}
+  .tri-lab{white-space:nowrap}
+}
+@media (prefers-reduced-motion:reduce){.tri-line{animation:none}.tri-plane::before{animation:none}}
+.ribbon{display:inline-flex;align-items:center;max-width:100%;
+  padding:5px 12px;border-radius:var(--r-pill);font-size:12px;font-weight:600;
+  color:var(--accent);border:1px solid rgba(0,113,227,.3);background:var(--surface);
+  white-space:nowrap;writing-mode:horizontal-tb;word-break:keep-all}
+.audit .svc .tag{flex:none;font-size:12px;font-weight:600;color:var(--text-2);
+  border:1px solid var(--hairline);border-radius:var(--r-pill);padding:3px 10px;white-space:nowrap}
+.audit .svc .tag.ok{color:var(--accent);border-color:rgba(0,113,227,.3)}
+
+/* ============ 项目列表：统一面板 + 发丝线 ============ */
+.prow{display:grid;grid-template-columns:minmax(0,2.2fr) 1.6fr auto auto;gap:14px;align-items:center;
+  padding:14px clamp(17px,3vw,24px);cursor:pointer;
+  transition:background .15s;}
+.prow:hover{background:var(--hover)}
+.prow+.prow{border-top:1px solid var(--hairline)}
+.prow .nm{font-weight:600;font-size:15px;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .nm .lang{margin-left:8px;font-size:11px;color:var(--text-3);font-weight:400}
+.prow .ds{font-size:13px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .act{display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.bar{width:44px;height:4px;border-radius:var(--r-pill);background:var(--track);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:var(--r-pill);background:var(--accent);width:0;transition:width .9s var(--ease-spring)}
+.commits{margin:2px clamp(17px,3vw,24px) 12px;padding:10px 14px;border-radius:var(--r-card);
+  background:var(--hover);font-size:12px;color:var(--text-2);display:none}
+.commits div{padding:3px 0}
+.commits .cd{font-family:var(--mono);color:var(--text-3);margin-right:10px}
+.pfoot{margin-top:10px;padding:0 clamp(17px,3vw,24px);font-size:12.5px;color:var(--text-3);line-height:1.6}
+@media (max-width:640px){.prow{grid-template-columns:1fr auto}.prow .ds{display:none}}
+
+/* ============ 近期动态 ============ */
+.rep{padding:20px clamp(17px,3vw,24px)}
+.rep .head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.rep .head b{font-size:15px;letter-spacing:-.01em}
+.rep .head .pill2{font-size:11.5px;color:var(--text-2);background:rgba(0,0,0,.05);border-radius:var(--r-pill);padding:3px 10px;font-variant-numeric:tabular-nums}
+.rep ul{list-style:none}
+.rep li{display:grid;grid-template-columns:34px 160px 1fr auto;gap:12px;align-items:baseline;
+  padding:9px 2px;border-top:1px solid var(--hairline);font-size:14px}
+.rep li:first-child{border-top:0}
+.rep li .cnt{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.rep li .nm{font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rep li .lt{color:var(--text-2);font-size:13px;line-height:1.55;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rep li .tm{color:var(--text-3);font-size:12px;font-variant-numeric:tabular-nums}
+@media (max-width:640px){.rep li{grid-template-columns:34px 110px 1fr auto}}
+
+footer{margin-top:clamp(60px,9vw,110px);text-align:center;font-size:12px;color:var(--text-3)}
+
+/* 进场：fade + rise（静态区块，非异步内容） */
+.reveal{opacity:0;transform:translateY(24px);
+  transition:opacity .7s var(--ease-out-quart),transform .7s var(--ease-spring);}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}
+  .tabbar a,.btn{transition:none}
+  html{scroll-behavior:auto}}
+@media (prefers-reduced-transparency:reduce){
+  .tabbar,#tip{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none}}
+@media (prefers-contrast:more){
+  .tabbar{background:var(--surface)}body{color:#000}.svc .sdesc,.rep li .lt{color:var(--text)}}
+</style>
+</head>
+<body>
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+<div class="glow" aria-hidden="true"></div>
+
+<main>
+  <!-- HERO -->
+  <header class="hero" id="top">
+    <div class="eyebrow"><span class="dot"></span><span data-i18n="eyebrow">LIVE · MEASURED</span></div>
+    <h1><span data-i18n="heroA">One machine.</span> <span class="accent" data-i18n="heroB">Every project, measured live.</span></h1>
+    <p class="sub" data-i18n="heroSub">Every number on this page is measured from this machine right now. Nothing staged.</p>
+
+    <div class="kpis">
+      <div class="kpi reveal"><div class="num"><span id="kLoc">0</span></div><div class="lab" data-i18n="kLoc">lines of code</div></div>
+      <div class="kpi reveal"><div class="num"><span id="kCommit">0</span></div><div class="lab" data-i18n="kCommit">git commits</div></div>
+      <div class="kpi reveal"><div class="num"><span id="kProj">0</span></div><div class="lab" data-i18n="kProj">projects</div></div>
+      <div class="kpi reveal"><div class="num"><span id="kLang">0</span></div><div class="lab" data-i18n="kLang">languages</div></div>
+    </div>
+  </header>
+
+  <!-- PROJECT RELATIONS -->
+  <section id="constellation" class="block">
+    <div class="sechead reveal">
+      <h2 data-i18n="secGalaxy">Projects in relation</h2>
+      <div class="hint" data-i18n="galaxyHint">based on real cross-references in source files</div>
+    </div>
+    <div class="panel galaxy-wrap reveal">
+      <canvas id="galaxy"></canvas>
+      <div class="galaxy-legend">
+        <span><b data-i18n="legNode">Node size</b> <span data-i18n="eq">=</span> <span data-i18n="legNode2">lines of code</span></span>
+        <span><b data-i18n="legEdge">Edge</b> <span data-i18n="eq2">=</span> <span data-i18n="legEdge2">project A references project B in source</span></span>
+        <span><b data-i18n="legHover">Hover</b> <span data-i18n="legHover2">a node to light up its routes</span></span>
+      </div>
+    </div>
+    <div class="panel langbar reveal">
+      <div class="row" id="langRow"></div>
+      <div class="legend" id="langLegend"></div>
+    </div>
+  </section>
+
+  <!-- SERVICES -->
+  <section id="systems" class="block">
+    <div class="sechead reveal">
+      <h2 data-i18n="secSys">Services</h2>
+      <div class="hint" data-i18n="sysHint">probed live · start or stop with one tap · reachable over Tailscale</div>
+    </div>
+    <div class="panel svcs reveal" id="svcGrid"></div>
+  </section>
+
+  <!-- AUTOMATION -->
+  <section id="automation" class="block">
+    <div class="sechead reveal">
+      <h2 data-i18n="secAuto">Automation</h2>
+      <div class="hint" data-i18n="autoHint">controllable services plus read-only capability notes · files stay where they are</div>
+    </div>
+    <div class="pdca" id="pdcaLine"></div>
+    <div class="panel pdca-box">
+      <div class="pdca-ring-title" data-i18n="ringTitle">Research · Think · Create · Act · Self-Improve</div>
+      <div class="pdca-sub" data-i18n="ringSub">Self-improvement loop (PDCA x MD constitution): each round feeds the next</div>
+      <div class="pdca-wrap" id="pdcaLoop" role="img" aria-label="Self-improvement loop: Research to Think to Create to Act to Self-Improve and back to Research">
+        <div class="pdca-ring">
+          <svg viewBox="0 0 320 320" role="img" aria-label="five-segment improvement ring">
+            <g class="ring-flow" fill="none" stroke-width="14" stroke-linecap="round">
+              <path d="M 169.2 55.4 A 105 105 0 0 1 256.7 119.0" stroke="#bfd9fb"/>
+              <path d="M 262.3 136.4 A 105 105 0 0 1 228.9 239.2" stroke="#8fbef8"/>
+              <path d="M 214.1 250.0 A 105 105 0 0 1 105.9 250.0" stroke="#5ea6f4"/>
+              <path d="M 91.1 239.2 A 105 105 0 0 1 57.7 136.4" stroke="#338ff0"/>
+              <path d="M 63.3 119.0 A 105 105 0 0 1 150.8 55.4" stroke="#0071e3"/>
+            </g>
+            <g class="ring-flow" stroke="none">
+              <polygon points="256.7,119.0 249.6,110.4 259.3,108.1" fill="#8fbef8"/>
+              <polygon points="228.9,239.2 233.2,228.9 239.7,236.4" fill="#5ea6f4"/>
+              <polygon points="105.9,250.0 117.0,250.9 111.9,259.4" fill="#338ff0"/>
+              <polygon points="57.7,136.4 60.3,147.3 50.6,145.0" fill="#0071e3"/>
+              <polygon points="150.8,55.4 141.3,61.3 140.4,51.3" fill="#0071e3"/>
+            </g>
+            <circle cx="160" cy="160" r="64" fill="#ffffff" stroke="rgba(0,0,0,.07)"/>
+            <g fill="#1d1d1f">
+              <text class="ring-label" x="207.6" y="94.5" text-anchor="middle" font-size="13" data-i18n="ringResearch">Research</text>
+              <text class="ring-label" x="237" y="185" text-anchor="middle" font-size="13" data-i18n="ringThink">Think</text>
+              <text class="ring-label" x="160" y="245" text-anchor="middle" font-size="13" data-i18n="ringCreate">Create</text>
+              <text class="ring-label" x="83" y="185" text-anchor="middle" font-size="13" data-i18n="ringAct">Act</text>
+              <text class="ring-label" x="112.4" y="94.5" text-anchor="middle" font-size="11.5" data-i18n="ringSelf">Self-Improve</text>
+            </g>
+            <g fill="#1d1d1f">
+              <text class="ring-center" x="160" y="157" text-anchor="middle" font-size="9.5" data-i18n="ringC1">Each run leaves a record</text>
+              <text class="ring-center" x="160" y="173" text-anchor="middle" font-size="9.5" fill="#6e6e73" data-i18n="ringC2">reused by the next round</text>
+            </g>
+          </svg>
+        </div>
+        <div class="md-const">
+          <div class="md-cap" data-i18n="mdCap">MD constitution iterates at Self-Improve</div>
+          <div class="md-pills">
+            <span class="md-pill" data-i18n="mdA">AGENTS rules</span>
+            <span class="md-pill" data-i18n="mdM">MISSION goals</span>
+            <span class="md-pill" data-i18n="mdT">todo ledger</span>
+            <span class="md-pill" data-i18n="mdF">FENGMEM log</span>
+            <span class="md-pill" data-i18n="mdS">Skill packs</span>
+          </div>
+          <div class="md-note" data-i18n="mdNote">Rules shape dialogue, results return to the ledger</div>
+        </div>
+      </div>
+    </div>
+    <div id="autoBody"></div>
+  </section>
+
+  <!-- PAPER: TWO-LAYER INTERFACE PRINCIPLE -->
+  <section id="paper" class="block">
+    <div class="sechead reveal">
+      <h2 data-i18n="secPaper">A paper, drawn</h2>
+      <div class="hint" data-i18n="paperHint">two-layer interface principle: L1 builds, L2 views, docs govern</div>
+    </div>
+    <div class="panel triad reveal">
+      <div class="tri-canvas">
+        <div class="tri-l1">
+          <div class="tri-lhead">
+            <span class="tri-tag1" data-i18n="triL1tag">L1 · DIALOGUE</span>
+            <span class="tri-ln" data-i18n="triL1">Dialogue layer</span>
+            <span class="tri-ld" data-i18n="triL1d">does the work — every action runs in conversation</span>
+          </div>
+          <div class="tri-row">
+            <div class="tri-node">
+              <div class="tri-name" data-i18n="triHuman">Human</div>
+              <div class="tri-note" data-i18n="triHumanNote">ops run through ZCode / Skill</div>
+            </div>
+            <div class="tri-link">
+              <div class="tri-lab" data-i18n="triEdgeNL">natural language (Skill)</div>
+              <svg viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true">
+                <line class="tri-line" x1="0" y1="7" x2="88" y2="7"/>
+                <polygon class="tri-head" points="88,2.5 100,7 88,11.5"/>
+              </svg>
+            </div>
+            <div class="tri-node tri-ai">
+              <div class="tri-name" data-i18n="triAi">AI</div>
+              <div class="tri-note" data-i18n="triAiNote">reads docs · calls tools · writes back</div>
+            </div>
+            <div class="tri-link">
+              <div class="tri-lab" data-i18n="triEdgeTool">tool calls</div>
+              <svg viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true">
+                <line class="tri-line" x1="0" y1="7" x2="88" y2="7"/>
+                <polygon class="tri-head" points="88,2.5 100,7 88,11.5"/>
+              </svg>
+            </div>
+            <div class="tri-node">
+              <div class="tri-name" data-i18n="triSys">System</div>
+              <div class="tri-note" data-i18n="triSysNote">real systems: the services probed on this page</div>
+            </div>
+          </div>
+        </div>
+        <div class="tri-iface">
+          <span class="if-item">
+            <svg viewBox="0 0 14 24" aria-hidden="true">
+              <line class="tri-line" x1="7" y1="0" x2="7" y2="16"/>
+              <polygon class="tri-head" points="2.5,16 7,24 11.5,16"/>
+            </svg>
+            <span class="if-lab" data-i18n="triIfL1">natural language / Skill — the human drives the AI</span>
+          </span>
+          <span class="if-item">
+            <svg viewBox="0 0 14 24" aria-hidden="true">
+              <line class="tri-line up" x1="7" y1="24" x2="7" y2="8"/>
+              <polygon class="tri-head up" points="2.5,8 7,0 11.5,8"/>
+            </svg>
+            <span class="if-lab" data-i18n="triIfL2">results surface read-only — the human just looks</span>
+          </span>
+        </div>
+        <div class="tri-l2">
+          <div class="tri-lhead">
+            <span class="tri-tag1" data-i18n="triL2tag">L2 · VIEW</span>
+            <span class="tri-ln" data-i18n="triL2">Viewing layer</span>
+            <span class="tri-ld" data-i18n="triL2d">watches — read-only, for checking and showing</span>
+          </div>
+          <div class="tri-note2" data-i18n="triL2Real">this page is the viewing layer (FengOS)</div>
+        </div>
+        <aside class="tri-plane">
+          <div class="tri-plane-t" data-i18n="govLoop">Docs governance plane</div>
+          <div class="tri-plane-s" data-i18n="triPlaneNote">AI reads it to start, writes back when done</div>
+          <div class="tri-junc">
+            <div class="tri-junc-tag" data-i18n="triJuncL1">at the L1 seam</div>
+            <div class="tri-jrow">
+              <svg viewBox="0 0 12 22" aria-hidden="true">
+                <line class="tri-line" x1="6" y1="0" x2="6" y2="14"/>
+                <polygon class="tri-head" points="1.5,14 6,22 10.5,14"/>
+              </svg>
+              <span class="jlab" data-i18n="govRead">read: starts with identity, rules, tasks</span>
+            </div>
+            <div class="tri-jrow">
+              <svg viewBox="0 0 12 22" aria-hidden="true">
+                <line class="tri-line up" x1="6" y1="22" x2="6" y2="8"/>
+                <polygon class="tri-head up" points="1.5,8 6,0 10.5,8"/>
+              </svg>
+              <span class="jlab" data-i18n="govWrite">write: results land in the ledger and the log</span>
+            </div>
+            <div class="tri-jrow">
+              <svg viewBox="0 0 12 22" aria-hidden="true">
+                <line class="tri-line" x1="6" y1="4" x2="6" y2="18"/>
+                <polygon class="tri-head" points="1.5,4 6,0 10.5,4"/>
+                <polygon class="tri-head" points="1.5,18 6,22 10.5,18"/>
+              </svg>
+              <span class="jlab" data-i18n="govRule">rule rewrite: AGENTS takes effect at once</span>
+            </div>
+          </div>
+          <div class="tri-md">
+            <span class="md-pill" data-i18n="mdA">AGENTS rules</span>
+            <span class="md-pill" data-i18n="mdM">MISSION goals</span>
+            <span class="md-pill" data-i18n="mdT">todo ledger</span>
+            <span class="md-pill" data-i18n="mdF">FENGMEM log</span>
+            <span class="md-pill" data-i18n="mdS">Skill packs</span>
+          </div>
+          <div class="tri-junc">
+            <div class="tri-junc-tag" data-i18n="triJuncL2">at the L2 seam</div>
+            <div class="tri-jrow">
+              <span class="jlab" data-i18n="govView">L2 stays read-only: every number mirrors the ledger</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+      <div class="tri-foot">
+        <span class="ribbon" data-i18n="govC1">C1 · data stays local</span>
+        <span class="ribbon" data-i18n="govC2">C2 · outputs into the backup pipeline</span>
+      </div>
+      <div class="tri-tagline" data-i18n="triadTagline">Docs are the control plane — AI is the strictest reader, it executes literally</div>
+      <div class="tri-cases">
+        <span data-i18n="triadCases">systems in production</span>
+        <span class="cn">FengInvest</span><span class="sep" aria-hidden="true">·</span>
+        <span class="cn">FengMedia</span><span class="sep" aria-hidden="true">·</span>
+        <span class="cn">FlyGo</span><span class="sep" aria-hidden="true">·</span>
+        <span class="cn">FengMail</span><span class="sep" aria-hidden="true">·</span>
+        <span data-i18n="triadPure">pure tools</span>
+        <span class="cn">TTS-UI</span>
+      </div>
+    </div>
+    <div class="panel svcs reveal audit" id="auditBody"></div>
+  </section>
+
+  <!-- PROJECTS -->
+  <section id="projects" class="block">
+    <div class="sechead reveal">
+      <h2 data-i18n="secProj">Projects</h2>
+      <div class="hint" id="projCount"></div>
+    </div>
+    <div class="panel plist reveal" id="plist"></div>
+    <div class="pfoot" data-i18n="projFootNote">Only self-owned repos mapped to local code: 33 public on GitHub + 2 local/gitee-only</div>
+  </section>
+
+  <!-- RECENT ACTIVITY -->
+  <section id="report" class="block">
+    <div class="sechead reveal">
+      <h2 data-i18n="secRep">Recent activity</h2>
+      <div class="hint" data-i18n="repHint">from real git logs</div>
+    </div>
+    <div class="panel rep reveal" id="repbody"></div>
+  </section>
+
+  <footer>FengOS · <span data-i18n="foot">aggregation only — never moves the data</span> · <span id="footTime"></span></footer>
+</main>
+
+<!-- 底部 Dock（粘性玻璃导航） -->
+<nav class="tabbar">
+  <a href="#top" data-i18n="navTop">Overview</a>
+  <a href="#constellation" data-i18n="navGalaxy">Relations</a>
+  <a href="#systems" data-i18n="navSys">Services</a>
+  <a href="#automation" data-i18n="navAuto">Automation</a>
+  <a href="#paper" data-i18n="navPaper">Paper</a>
+  <a href="#projects" data-i18n="navProj">Projects</a>
+  <a href="#report" data-i18n="navRep">Activity</a>
+  <button id="langBtn">中文</button>
+</nav>
+<div id="tip"></div>
+
+<script>
+/* ?static=1 → 关闭画布流点动画，保证截图确定性 */
+const STATIC_MODE = new URLSearchParams(location.search).has("static");
+
+/* ================= i18n ================= */
+const I18N = {
+  en:{eyebrow:"LIVE · MEASURED",
+    heroA:"One machine.", heroB:"Every project, measured live.",
+    heroSub:"Every number on this page is measured from this machine right now. Nothing staged.",
+    kLoc:"lines of code", kCommit:"git commits", kProj:"projects", kLang:"languages",
+    eq:"=", eq2:"=",
+    secGalaxy:"Projects in relation",
+    galaxyHint:"based on real cross-references in source files",
+    legNode:"Node size", legNode2:"lines of code", legEdge:"Edge", legEdge2:"project A references project B in source",
+    legHover:"Hover", legHover2:"a node to light up its routes",
+    secSys:"Services",
+    sysHint:"probed live · start or stop with one tap · reachable over Tailscale",
+    secAuto:"Automation",
+    autoHint:"controllable services plus read-only capability notes · files stay where they are",
+    pdca:"Research → Think → Create → Act → Self-Improve: each round is recorded, reviewed, and fed back into the MD constitution",
+    secProj:"Projects", projFootNote:"Only self-owned repos mapped to local code: 33 public on GitHub + 2 local/gitee-only",
+    secPaper:"A paper, drawn",
+    paperHint:"two-layer interface principle: L1 builds, L2 views, docs govern",
+    triHuman:"Human", triAi:"AI", triSys:"System",
+    triEdgeNL:"natural language (Skill)", triEdgeTool:"tool calls",
+    triHumanNote:"ops run through ZCode / Skill",
+    triAiNote:"reads docs · calls tools · writes back",
+    triSysNote:"real systems: the services probed on this page",
+    triIfL1:"natural language / Skill — the human drives the AI",
+    triIfL2:"results surface read-only — the human just looks",
+    triL1tag:"L1 · DIALOGUE", triL1:"Dialogue layer", triL1d:"does the work — every action runs in conversation",
+    triL2tag:"L2 · VIEW", triL2:"Viewing layer", triL2d:"watches — read-only, for checking and showing",
+    triL2Real:"this page is the viewing layer (FengOS)",
+    triPlaneNote:"AI reads it to start, writes back when done",
+    triJuncL1:"at the L1 seam", triJuncL2:"at the L2 seam",
+    govLoop:"Docs governance plane",
+    govRead:"read: starts with identity, rules, tasks",
+    govWrite:"write: results land in the ledger and the log",
+    govRule:"rule rewrite: AGENTS takes effect at once",
+    govView:"L2 stays read-only: every number mirrors the ledger",
+    triadTagline:"Docs are the control plane — AI is the strictest reader, it executes literally",
+    triadCases:"systems in production", triadPure:"pure tools",
+    rFiDesc:"Quant platform: market scripts wired to APIs, settling into local SQL stores",
+    rSkDesc:"Generic retrieval flagship: multi-backend crawling, results feed local stores",
+    rAeDesc:"Aggregates outputs across AI providers into self-built corpora",
+    rschCorpusT:"Settled corpus", rschCorpusD:"Moving the external world's long-form text into local stores: chapters kept in full, offline-readable",
+    rschLedgerT:"Research ledger", rschLedgerD:"Every research step leaves a record and distills into assets the next round reuses",
+    tkLine:"The think layer in daily operation: the AI starts by reading MD docs and writes results back when done",
+    tkF1:"read MD docs", tkF2:"gain identity, rules & tasks", tkF3:"execute", tkF4:"write back to ledger & log",
+    tkCardSocName:"GUI autopilot",
+    tkCardSocD:"Planned GUI autopilot; every move would follow the AGENTS rules read at startup",
+    tkCardKits:"Guides & governing docs",
+    tkCardKitsD:"guides and learned scripts from past runs, plus the MD docs that govern the fleet",
+    tkPlanned:"planned", tkReadOnly:"read-only",
+    tkNote:"Numbers are read live from /api/automation; files stay where they are",
+    navPaper:"Paper",
+    secRep:"Recent activity",
+    repHint:"from real git logs", foot:"aggregation only — never moves the data",
+    navTop:"Overview", navGalaxy:"Relations", navSys:"Services", navAuto:"Automation", navProj:"Projects", navRep:"Activity",
+    open:"Open", start:"Start", stop:"Stop", starting:"Starting…", stopping:"Stopping…",
+    started:"listening", stopped:"stopped", fail:"failed — check server log",
+    tsNote:"Tailscale", localNote:"local",
+    refs:"refs", lines:"lines",
+    last7:"no commits today · last 7 days", commitsToday:"commits today",
+    today:"Today", lastDays:"Last 7 days",
+    projectsWord:"projects", noRef:"No cross-references detected from real source scan.",
+    graphLoading:"loading project graph…", graphFail:"project graph unavailable — retrying…",
+    createDef:"Create = you make a thing, not yet distributed",
+    createDefEn:"Create = you make a thing, not yet distributed",
+    crFmD:"The create hub: topic to finished video; project count measured from disk, read-only here",
+    crTextD:"Text and copy generation; works stay local, not yet distributed",
+    crImgD:"Image and cover generation; works stay local, not yet distributed",
+    crMusD:"FengMusician toolset in FengMedia/tools/fengmusician; read-only here",
+    crTtsD:"TTS-UI desktop bundle stays local; read-only",
+    crAvaD:"Live-action verified, anime VRM verifying; read-only here",
+    crVidD:"Finished films rendered with the HyperFrames toolchain; drafts may start from the open-source MoneyPrinterTurbo",
+    crFiD:"Invest creates too: market research and asset analysis reports are made things, staying local until distributed",
+    thinkLine:"AI reads MD docs before planning: rules constrain every run",
+    actDef:"Act = distribute to others, affect the outside",
+    actHunterName:"JobHunter (<private-repo>)",
+    actHunterDesc:"Generic batch form execution / automated form filling; outward submission within the authorized scope",
+    actMailName:"FengMail / FENGmailMac (Mac)",
+    actMailDesc:"Mail outbound: after authorization, calls APIs to deliver mail that reaches recipients; FENGmailMac confirmed on the Mac machine",
+    actChanName:"Distribution channels",
+    actChanDesc:"Git dual push to GitHub + gitee; publish/distribute actions are documented here read-only",
+    actLocal:"confirmed local",
+    actNoCreds:"credentials never shown",
+    actSocName:"Autonomous executor triad",
+    actSocDesc:"Universal means of outward execution: GUI agent + CLI agent + MD docs, executing per MD docs",
+    actApi:"Authorized → external APIs",
+    actApiDesc:"FengMail / FENGmailMac mail and market data, authorized before calls",
+    actReadOnly:"read-only", actPlanned:"planned",
+    ringTitle:"Research · Think · Create · Act · Self-Improve",
+    ringSub:"Self-improvement loop (PDCA + MD constitution): each round feeds the next",
+    ringResearch:"Research", ringThink:"Think", ringCreate:"Create", ringAct:"Act", ringSelf:"Self-Improve",
+    ringC1:"Each run leaves a record", ringC2:"reused by the next round",
+    mdCap:"MD constitution iterates at Self-Improve",
+    mdA:"AGENTS rules", mdM:"MISSION goals", mdT:"todo ledger", mdF:"FENGMEM log", mdS:"Skill packs",
+    mdNote:"Rules shape dialogue, results return to the ledger",
+    govC1:"C1 · data stays local", govC2:"C2 · outputs into the backup pipeline",
+    siQuote:"Docs are the control plane — each iteration rewrites the constitution, the constitution shapes the next loop",
+    siRec:"Every round leaves a record", siRecNote:"FENGMEM append · todo write-off · retrospective write-back",
+    siRule:"Rules rewritten in AGENTS.md", siRuleNote:"takes effect on the very next round",
+    siBack:"loops back to Research", siBackNote:"AI is the stricter reader — it executes literally",
+    siOrch:"AI-commanding-AI fleet hub: vision, role division and retrospectives all iterate in MD docs — edit a rule, the next round obeys it",
+    siAsni:"Multi-machine profile hub: one MD profile per machine, skill and software inventories shared — human and AI read the same MD",
+    siDocs:"docs", siSkills:"skills", siProfiles:"profiles", siShared:"shared"},
+  zh:{eyebrow:"实时 · 实测",
+    heroA:"一台机器。", heroB:"每个项目，实时可查。",
+    heroSub:"本页每一个数字都从这台机器实时测得。",
+    kLoc:"行代码", kCommit:"次提交", kProj:"个项目", kLang:"种语言",
+    eq:"=", eq2:"=",
+    secGalaxy:"项目关系",
+    galaxyHint:"基于真实源码文件的相互引用",
+    legNode:"节点大小", legNode2:"代码行数", legEdge:"连线", legEdge2:"A 项目在源码里引用了 B 项目",
+    legHover:"悬停", legHover2:"节点，查看它的引用关系",
+    secSys:"服务",
+    sysHint:"端口实时探活 · 一键启动或停止 · Tailscale 全网可达",
+    secAuto:"自动化",
+    autoHint:"可启停的服务加只读能力说明 · 文件留在原处",
+    pdca:"研究 → 思考 → 创作 → 行动 → 自我改进：每轮留记录、做复盘，结果回写 MD 宪法，驱动下一轮",
+    secProj:"项目", projFootNote:"本页只计与本机代码对应的自有仓库：GitHub 公开 33 + 仅本机/gitee 2",
+    secPaper:"一篇论文，一张图",
+    paperHint:"两层界面原则：对话层负责做、观景层负责看、文档层负责管",
+    triHuman:"人 Human", triAi:"AI", triSys:"系统 System",
+    triEdgeNL:"自然语言（Skill）", triEdgeTool:"工具调用",
+    triHumanNote:"操作走 ZCode / Skill",
+    triAiNote:"读文档 · 调工具 · 写回账本",
+    triSysNote:"真实系统：本页探活的服务",
+    triIfL1:"自然语言 / Skill——人驱动 AI",
+    triIfL2:"结果只读呈现——人只管看",
+    triPlaneNote:"AI 开工先读，完工写回",
+    triJuncL1:"L1 交界处", triJuncL2:"L2 交界处",
+    govLoop:"文档治理面",
+    govRead:"读：开工自带身份、规则、任务",
+    govWrite:"写：结果落回账本与日志",
+    govRule:"规则改写：AGENTS 即生效",
+    govView:"L2 只读：每个数字都是账本数据的反映",
+    triadTagline:"文档即控制平面——AI 是更严格的读者，它真的逐字执行",
+    triadCases:"落地系统", triadPure:"纯工具",
+    rFiDesc:"量化研究平台：行情脚本对接 API，落成本地 SQL 建库",
+    rSkDesc:"通用检索旗舰：多后端反爬，结果供本地建库",
+    rAeDesc:"聚合各家 AI 输出，沉淀自有模型语料",
+    rschCorpusT:"语料沉淀", rschCorpusD:"把外部世界的长文本搬进本地：章节全文留存，随时离线可读",
+    rschLedgerT:"研究台账", rschLedgerD:"研究的每一步都留记录、蒸馏成可复用资产，喂给下一轮",
+    tkLine:"思考层的日常：AI 开工先读 MD 文档，行动产生的结果再回写账本与日志",
+    tkF1:"读 MD 文档", tkF2:"获得身份、规则与任务", tkF3:"执行", tkF4:"回写账本与日志",
+    tkCardSocName:"GUI 自动驾驶",
+    tkCardSocD:"规划中的 GUI 自动驾驶层：每一步都遵守开工时读入的 AGENTS 规则",
+    tkCardKits:"攻略与治理文档",
+    tkCardKitsD:"历轮沉淀的攻略与复用脚本，加治理舰队的 MD 文档",
+    tkPlanned:"规划中", tkReadOnly:"只读",
+    tkNote:"数字全部来自 /api/automation 实时统计，文件留在原处",
+    navPaper:"论文",
+    secRep:"近期动态",
+    repHint:"来自真实 git log", foot:"只聚合，不搬数据",
+    navTop:"概览", navGalaxy:"关系", navSys:"服务", navAuto:"自动化", navProj:"项目", navRep:"动态",
+    open:"打开", start:"启动", stop:"停止", starting:"启动中…", stopping:"停止中…",
+    started:"已在监听", stopped:"已停止", fail:"失败——查服务器日志",
+    tsNote:"Tailscale", localNote:"本机",
+    refs:"处引用", lines:"行",
+    last7:"今日无提交 · 近 7 天", commitsToday:"今日提交",
+    today:"今日", lastDays:"近 7 天",
+    projectsWord:"个项目", noRef:"真实源码扫描未检出跨项目引用。",
+    graphLoading:"正在加载项目关系…", graphFail:"项目关系暂不可用——正在重试…",
+    createDef:"创作 = 做出一个东西，尚未分发给别人",
+    createDefEn:"Create = you make a thing, not yet distributed",
+    crFmD:"创作主体：从选题到成片的完整管线，projects 数来自磁盘实况，本机只读展示",
+    crTextD:"文本与文案生成：作品先留本机，尚未分发",
+    crImgD:"图像与封面生成：作品先留本机，尚未分发",
+    crMusD:"FengMusician 工具集：FengMedia/tools/fengmusician，本机只读",
+    crTtsD:"TTS-UI 桌面程序打包在本机：只读展示",
+    crAvaD:"真人路线已验证、动漫 VRM 验证中：本机只读",
+    crVidD:"成片走 HyperFrames 工具链渲染：草稿可由开源 MoneyPrinterTurbo 起步",
+    crFiD:"Invest 也是创作：行情研究、资产分析报告都是做出来的东西，分发前留在本机",
+    thinkLine:"AI 先读 MD 文档再规划：规则约束每一次执行",
+    actDef:"行动 = 分发给他人、对外产生影响",
+    actHunterName:"JobHunter（<private-repo>）",
+    actHunterDesc:"通用批量表单执行 / 自动化填报；按授权范围对外逐条提交",
+    actMailName:"FengMail / FENGmailMac（Mac 机）",
+    actMailDesc:"邮件外发：授权后走 API，把邮件送达收件人、对外产生影响；FENGmailMac 本机确认存在",
+    actChanName:"分发渠道",
+    actChanDesc:"git 双推 GitHub + gitee；发布/分发动作此处只读说明",
+    actLocal:"本机已确认",
+    actNoCreds:"凭据绝不展示",
+    actSocName:"自主执行三件套",
+    actSocDesc:"对外执行的通用手段：GUI agent + CLI agent + MD 文档，按 MD 文档执行",
+    actApi:"授权 → 调外部 API",
+    actApiDesc:"FengMail / FENGmailMac 邮件、行情接口，先授权后调用",
+    actReadOnly:"只读", actPlanned:"规划中",
+    ringTitle:"研究 · 思考 · 创作 · 行动 · 自我改进",
+    ringSub:"自我改进闭环（PDCA + MD 宪法）：每一轮喂给下一轮",
+    ringResearch:"研究", ringThink:"思考", ringCreate:"创作", ringAct:"行动", ringSelf:"自我改进",
+    ringC1:"每次执行留记录、做复盘", ringC2:"供下一次复用",
+    mdCap:"MD 宪法在自我改进处迭代",
+    mdA:"AGENTS 规则", mdM:"MISSION 目标", mdT:"todo 账本", mdF:"FENGMEM 记录", mdS:"Skill 包",
+    mdNote:"规则约束对话，结果回到账本",
+    triL1tag:"L1 · 对话层", triL1:"对话层", triL1d:"负责做——每个动作都在对话里跑",
+    triL2tag:"L2 · 观景层", triL2:"观景层", triL2d:"负责看——只读，用于检查和展示",
+    triL2Real:"本页即观景层（FengOS）",
+    govC1:"C1 · 资料恒本地", govC2:"C2 · 产出进可备份管道",
+    siQuote:"文档即控制平面——每一圈迭代改写宪法，宪法约束下一圈",
+    siRec:"每轮执行留记录", siRecNote:"FENGMEM 追加 · todo 销账 · 复盘回写",
+    siRule:"规则在 AGENTS.md 里改写", siRuleNote:"即对下一轮生效",
+    siBack:"每一圈兜回研究", siBackNote:"AI 是更严格的读者——真的逐字执行",
+    siOrch:"AI 指挥 AI 的舰队中枢：愿景/分工/复盘全在 MD 里迭代，改一条规则，下一轮即照新规则执行",
+    siAsni:"多机 Profile 中枢：每机一档、Skill/软件清单共享，人与 AI 读同一套 MD",
+    siDocs:"docs", siSkills:"skills", siProfiles:"profiles", siShared:"shared"}
+};
+let LANG = localStorage.getItem("fengos-lang") || "en";
+const $ = id => document.getElementById(id);
+function t(k){ return (I18N[LANG] && I18N[LANG][k]) || I18N.en[k] || k; }
+function fmt(n){ return n.toLocaleString(LANG==="zh"?"zh-CN":"en-US"); }
+function applyLang(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{ el.textContent = t(el.dataset.i18n); });
+  $("langBtn").textContent = LANG==="en" ? "中文" : "EN";
+  const pd = $("pdcaLine"); if(pd) pd.textContent = t("pdca");
+  renderAudit();
+  renderAutomation();
+  pollControls();
+}
+$("langBtn").addEventListener("click",()=>{
+  LANG = LANG==="en"?"zh":"en"; localStorage.setItem("fengos-lang",LANG); applyLang();
+});
+
+/* ================= 数字滚动 ================= */
+function countUp(el,target,dur=1400){
+  const start = performance.now();
+  (function step(now){
+    const p = Math.min(1,(now-start)/dur), e = 1-Math.pow(1-p,3);
+    el.textContent = fmt(Math.round(target*e));
+    if(p<1) requestAnimationFrame(step);
+  })(performance.now());
+}
+
+/* ================= 项目规模 + 关系图 ================= */
+/* 语言构成条配色：蓝阶明度变化 + 灰阶，不引入新色相 */
+const BLUE_SCALE = ["#0071e3","#338ff0","#5ea6f4","#8fbef8","#bfd9fb","#d9e9fd"];
+const OTHERS_COLOR = "#aeaeb2";   /* --text-4 */
+const ACCENT = "#0071e3";
+const NODE_COLOR = "#1d1d1f";
+let GRAPH = null;
+let hoverNode = null;
+
+async function loadGraph(){
+  try{
+    const r = await fetch("/api/graph");
+    if(!r.ok) throw new Error("http "+r.status);
+    const d = await r.json();
+    GRAPH = (d && d.ok) ? d : null;
+  }catch(e){ GRAPH = null; }
+  if(!GRAPH){
+    $("kLoc").textContent="—";
+    return;   /* 定时器会重试，画布上会显示提示文字，不留空白画布 */
+  }
+  countUp($("kLoc"), GRAPH.totals.loc);
+  countUp($("kCommit"), GRAPH.totals.commits);
+  countUp($("kProj"), GRAPH.totals.projects);
+  countUp($("kLang"), GRAPH.totals.langs);
+  renderLangs();
+}
+function renderLangs(){
+  const tot = GRAPH.langLoc.reduce((s,x)=>s+x.loc,0) || 1;
+  const top = GRAPH.langLoc.slice(0,6), rest = GRAPH.langLoc.slice(6);
+  const row = $("langRow"); row.innerHTML="";
+  const seg = (name,loc,color)=>{
+    const d = document.createElement("div"); d.className="seg";
+    d.style.width = (loc/tot*100).toFixed(2)+"%";
+    d.style.background = color; row.appendChild(d);
+  };
+  const legend = $("langLegend"); legend.innerHTML="";
+  const addLeg=(name,loc,color)=>{
+    const s = document.createElement("span");
+    s.innerHTML = `<i style="background:${color}"></i>${name} · ${fmt(loc)}`;
+    legend.appendChild(s);
+  };
+  let restLoc=0;
+  top.forEach((x,i)=>{ const c = BLUE_SCALE[Math.min(i, BLUE_SCALE.length-1)]; seg(x.lang,x.loc,c); addLeg(x.lang,x.loc,c); });
+  rest.forEach(x=>restLoc+=x.loc);
+  if(restLoc>0){ seg("others",restLoc,OTHERS_COLOR); addLeg("others",restLoc,OTHERS_COLOR); }
+}
+
+/* ---- 星图画布：35 节点全入图，双环确定性布局；浅色主题
+        （节点深墨 #1d1d1f、边线灰阶、hover 用唯一强调色蓝） ---- */
+function drawGalaxy(){
+  const cv = $("galaxy"); if(!cv) return;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if(!W || !H) return;
+  const dpr = window.devicePixelRatio||1;
+  if(cv.width !== Math.round(W*dpr) || cv.height !== Math.round(H*dpr)){
+    cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  try{
+    if(!GRAPH || !GRAPH.ok){
+      /* 数据未就绪：画可见提示 */
+      ctx.font = `500 15px ${getComputedStyle(document.body).fontFamily}`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(0,113,227,.55)";
+      ctx.fillText(GRAPH===null && galaxyTried ? t("graphFail") : t("graphLoading"), W/2, H/2);
+      return;
+    }
+    /* 全部节点入图，按 loc 降序 */
+    const nodes = GRAPH.nodes.slice().sort((a,b)=>b.loc-a.loc);
+    if(!nodes.length) return;
+    const name2n = {}; nodes.forEach(n=>name2n[n.name]=n);
+    const edges = GRAPH.edges.filter(e=>name2n[e.from]&&name2n[e.to]).slice(0,80);
+    const maxLoc = nodes[0].loc || 1;
+    /* 确定性布局：内环 10 + 外环 */
+    const inner = Math.min(10, nodes.length);
+    nodes.forEach((n,i)=>{
+      const ring = i<inner?0:1;
+      const cnt = ring===0?inner:nodes.length-inner;
+      const idx = ring===0?i:i-inner;
+      const a = (idx/Math.max(1,cnt))*Math.PI*2 + (ring?0.35:0);
+      const rr = ring===0 ? Math.min(W,H)*0.20 : Math.min(W,H)*0.40;
+      /* 窄屏自适应：把椭圆压进画布内——水平方向按画布宽度压缩（fx<1 时收拢），防长项目名溢出 */
+      const fx = Math.min(1.35, (W/2-40)/rr);
+      n.x = W/2 + Math.cos(a)*rr*fx;
+      n.y = H/2 + Math.sin(a)*rr*0.92;
+      n.r = 6 + Math.sqrt(Math.max(0,n.loc)/maxLoc)*Math.min(26, W*0.055);
+    });
+    const edgesByNode = {};
+    edges.forEach(e=>{ (edgesByNode[e.from]=edgesByNode[e.from]||[]).push(e);
+                       (edgesByNode[e.to]=edgesByNode[e.to]||[]).push(e); });
+    const hl = hoverNode && name2n[hoverNode.name] ? hoverNode : null;
+    /* 直线连线：默认灰阶发丝线，hover 相关边用蓝 */
+    edges.forEach(e=>{
+      const a = name2n[e.from], b = name2n[e.to];
+      const hot = hl && (e.from===hl.name || e.to===hl.name);
+      ctx.beginPath();
+      ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+      ctx.strokeStyle = hot ? "rgba(0,113,227,.85)"
+                      : (hl ? "rgba(0,0,0,.05)" : "rgba(0,0,0,.16)");
+      ctx.lineWidth = hot ? Math.min(2.4,.8+e.refs/40) : 1;
+      ctx.stroke();
+    });
+    /* 沿线流动的小点（static 模式下关闭，保证确定性） */
+    if(!STATIC_MODE){
+      edges.forEach(e=>{
+        if(e.refs<=10 && !hl) return;
+        const a = name2n[e.from], b = name2n[e.to];
+        const hot = hl && (e.from===hl.name || e.to===hl.name);
+        if(!hot && hl) return;
+        const p = (Date.now()/2600 + (e.refs%10)/10) % 1;
+        ctx.beginPath(); ctx.arc(a.x+(b.x-a.x)*p, a.y+(b.y-a.y)*p, hot?3:2, 0, 7);
+        ctx.fillStyle = hot?"rgba(0,113,227,.95)":"rgba(0,113,227,.45)"; ctx.fill();
+      });
+    }
+    /* 节点：深墨实心圆 + 描边 + 名称（浅色底上深色文字） */
+    nodes.forEach((n,i)=>{
+      const hot = hl && hl.name===n.name;
+      const linked = hl && edgesByNode[hl.name] && edgesByNode[hl.name].some(e=>e.from===n.name||e.to===n.name);
+      const dim = hl && !hot && !linked;
+      const act = (typeof n.activity==="number") ? Math.max(.25,Math.min(1,n.activity/100)) : (1 - i/nodes.length*.55);
+      ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,7);
+      ctx.fillStyle = hot ? ACCENT : hexA(NODE_COLOR, dim?.06:Math.max(.25,act*.8));
+      ctx.fill();
+      ctx.lineWidth = hot?2:1;
+      ctx.strokeStyle = hot ? ACCENT : hexA(NODE_COLOR, dim?.08:.28);
+      ctx.stroke();
+      ctx.font = `${hot||linked?600:400} ${hot?13:11}px ${getComputedStyle(document.body).fontFamily}`;
+      if(W<520) ctx.font = `${hot||linked?600:400} ${hot?11:9.5}px ${getComputedStyle(document.body).fontFamily}`;
+      ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+      /* 窄屏：无 hover 时只显示最大的 6 个项目名，其余名字隐藏防重叠成一片 */
+      const showName = W>=520 || hot || linked || i<6;
+      if(showName){
+        ctx.fillStyle = dim ? "rgba(0,0,0,.20)" : (hot?"rgba(0,113,227,1)":"rgba(0,0,0,.65)");
+        ctx.fillText(n.name, n.x, n.y+n.r+14);
+      }
+    });
+  }catch(err){ /* 单帧渲染错误不允许杀掉渲染循环 */ }
+}
+function hexA(hex,a){
+  const m = hex.replace("#",""); const v = parseInt(m.length===3?m.split("").map(c=>c+c).join(""):m,16);
+  return `rgba(${(v>>16)&255},${(v>>8)&255},${v&255},${a})`;
+}
+let galaxyTried = false;
+(function(){
+  const tip = $("tip"), cv = $("galaxy");
+  let last=0;
+  function raf(now){ if(now-last>33){ last=now; drawGalaxy(); } requestAnimationFrame(raf); }
+  requestAnimationFrame(raf);
+  cv.addEventListener("mousemove",ev=>{
+    if(!GRAPH||!GRAPH.ok) return;
+    const r = cv.getBoundingClientRect();
+    const x = ev.clientX-r.left, y = ev.clientY-r.top;
+    let hit = null;
+    for(const n of GRAPH.nodes){
+      if(n.x==null) continue;
+      if(Math.hypot(x-n.x,y-n.y) <= n.r+6){ hit=n; break; }
+    }
+    hoverNode = hit;
+    if(hit){
+      const out = GRAPH.edges.filter(e=>e.from===hit.name);
+      const inn = GRAPH.edges.filter(e=>e.to===hit.name);
+      let html = `<b>${hit.name}</b> · ${fmt(hit.loc)} ${t("lines")}<br>`;
+      out.slice(0,3).forEach(e=>html+=`→ ${e.to} <span class="muted">${e.refs} ${t("refs")}</span><br>`);
+      inn.slice(0,3).forEach(e=>html+=`← ${e.from} <span class="muted">${e.refs} ${t("refs")}</span><br>`);
+      tip.innerHTML = html; tip.style.opacity=1;
+      tip.style.left = Math.min(ev.clientX+16, innerWidth-240)+"px";
+      tip.style.top = (ev.clientY+16)+"px";
+      cv.style.cursor="pointer";
+    } else { tip.style.opacity=0; cv.style.cursor="crosshair"; }
+  });
+  cv.addEventListener("mouseleave",()=>{ hoverNode=null; tip.style.opacity=0; });
+})();
+
+/* ================= 服务：探活 + 一键启动/停止 ================= */
+/* Tailscale 链路：tailscale serve 把 tailnet HTTPS 反代到本机端口，
+   拉起进程本身 = Tailscale 可达；tsUrl 是外网访问地址。 */
+const SERVICES = [
+  {name:"FengInvest", port:23456, ts:":23456",
+   desc:{en:"Quant research & backtest platform", zh:"量化研究与回测平台"}},
+  {name:"FengMedia", port:23457, ts:":23457",
+   desc:{en:"Content & media production pipeline", zh:"内容与媒体生产管线"}},
+  {name:"AIExport", port:8787, ts:null,
+   desc:{en:"AI chat export & archive tooling", zh:"AI 对话导出与归档工具"}},
+  {name:"CAO", port:9889, ts:null,
+   desc:{en:"AI agent fleet control plane (WSL)", zh:"AI 干事舰队控制面（WSL）"}},
+  {name:"webcli", port:8788, ts:":8443",
+   desc:{en:"Browser-based CLI for the fleet", zh:"舰队用的浏览器终端"}},
+  {name:"FlyGo", port:8388, ts:null,
+   desc:{en:"General-purpose task autopilot", zh:"通用任务自动执行"}},
+  {name:"MoneyPrinterTurbo", port:8501, ts:null,
+   desc:{en:"Short-video draft generator (Streamlit)", zh:"短视频草稿生成（Streamlit）"}},
+  {name:"TwentyCRM", port:3002, ts:null,
+   desc:{en:"Customer records (docker compose)", zh:"客户记录（docker compose）"}},
+];
+const TS_HOST = "https://<panel-node>.ts.net";
+let SVC_STATE = {};   /* name -> bool online（来自 /api/controls） */
+let svcBusy = {};     /* name -> bool */
+
+async function pollControls(){
+  try{
+    const r = await fetch("/api/controls");
+    const d = await r.json();
+    (d.services||[]).forEach(c=>{ SVC_STATE[c.name]=!!c.online;
+      const s = SERVICES.find(x=>x.name===c.name); if(s && c.ts != null) s.ts = c.ts; });
+  }catch(e){}
+  renderSvcGrid();
+}
+function dot(isOn){ return `<span class="dot ${isOn?"on":""}"></span>`; }
+function showSvcMsg(name, text){
+  const el = document.querySelector(`[data-msg="${name}"]`);
+  if(!el) return;
+  el.textContent = text||"";
+  el.classList.toggle("show", !!text);
+  clearTimeout(el._fadeT);
+  if(text){ el._fadeT = setTimeout(()=>el.classList.remove("show"), 2000); }
+}
+/* ---- 自动化 svc 行：与服务区同一结构（SVC_STATE / svcBusy 共用） ---- */
+function svcRow(s){
+  const on = !!SVC_STATE[s.name], busy = !!svcBusy[s.name];
+  const openUrl = svcOpenUrl(s);
+  return `
+  <div class="svc">
+    <div class="sname"><span class="name">${s.name}</span>${dot(on)}</div>
+    <p class="sdesc">${s.desc[LANG]||s.desc.en}</p>
+    <div class="ts">${t("tsNote")} ${s.ts ? TS_HOST+(s.ts.startsWith(":")?s.ts:s.ts) : "—"}</div>
+    <div class="lead" aria-hidden="true"></div>
+    <div class="stop-h">
+      <span class="msg" data-msg="${s.name}"></span>
+      ${on
+        ? `<button class="btn stop" data-act="stop" data-name="${s.name}" ${busy?"disabled":""}>${busy?t("stopping"):t("stop")}</button>`
+        : `<button class="btn start" data-act="start" data-name="${s.name}" ${busy?"disabled":""}>${busy?t("starting"):t("start")}</button>`}
+      <a class="open" href="${openUrl}" target="_blank" rel="noopener" title="${t("open")}">›</a>
+    </div>
+  </div>`;
+}
+/* 打开地址：优先 tailscale serve 反代；本机 localhost 场景仍走 localhost，
+   通过 Tailnet/局域网访问时（主机不是 localhost）无反代的服务回退到当前主机同端口。 */
+function svcOpenUrl(s){
+  if(s.ts != null) return TS_HOST + s.ts;
+  if(location.hostname !== "localhost" && location.hostname !== "127.0.0.1" && location.hostname !== "")
+    return `${location.protocol}//${location.hostname}:${s.port}`;
+  return `http://localhost:${s.port}`;
+}
+function renderSvcGrid(){
+  const grid = $("svcGrid");
+  const prevFocus = document.activeElement;
+  grid.innerHTML = SERVICES.slice(0,6).map(svcRow).join("");
+  grid.querySelectorAll("button[data-act]").forEach(btn=>{
+    btn.addEventListener("click",()=>controlService(btn.dataset.act, btn.dataset.name));
+  });
+  /* 离线时点 › 不跳死链：先拉起服务，在线后自动开新页（后端调度） */
+  grid.querySelectorAll("a.open").forEach(a=>{
+    a.addEventListener("click",ev=>{
+      const row = a.closest(".svc"); if(!row) return;
+      const name = row.querySelector("[data-name]")?.dataset.name;
+      if(!name || SVC_STATE[name]) return;
+      ev.preventDefault();
+      controlService("start", name);
+      const t0 = Date.now();
+      const poll = setInterval(()=>{
+        fetch("/api/controls").then(r=>r.json()).then(d=>{
+          const s=(d.services||[]).find(x=>x.name===name);
+          if(s && s.online){ clearInterval(poll); window.open(svcOpenUrl(s),"_blank"); }
+          else if(Date.now()-t0>30000) clearInterval(poll);
+        }).catch(()=>{ if(Date.now()-t0>30000) clearInterval(poll); });
+      },1200);
+    });
+  });
+  if(prevFocus && prevFocus.dataset && prevFocus.dataset.act){
+    const nb = grid.querySelector(`button[data-act="${prevFocus.dataset.act}"][data-name="${prevFocus.dataset.name}"]`);
+    if(nb && !nb.disabled) nb.focus();
+  }
+  renderAutomation();
+}
+async function controlService(act, name){
+  if(svcBusy[name]) return;
+  svcBusy[name] = true;
+  renderSvcGrid();
+  showSvcMsg(name, act==="start" ? t("starting") : t("stopping"));
+  let res = {};
+  try{
+    const r = await fetch(`/api/service/${encodeURIComponent(name)}/${act}`, {method:"POST"});
+    res = await r.json();
+  }catch(e){ res = {ok:false, error:String(e)}; }
+  svcBusy[name] = false;
+  await pollControls();
+  const nowOn = !!SVC_STATE[name];
+  let text;
+  if(act==="start"){
+    text = res.ok && nowOn ? t("started") : (res.error||t("fail"));
+  }else{
+    text = !nowOn ? t("stopped") : (res.error||t("fail"));
+  }
+  showSvcMsg(name, text);
+}
+
+/* ================= 自动化：四层只读视图 + 复用 svc 启停 ================= */
+/* 研究 / 思考 / 创作 / 行动；每个分组一个 .panel，外加自我改进 Self-Improve 闭环（PDCA + MD 宪法）。
+   可拉起项复用 svcRow + 同一份 SVC_STATE/svcBusy；无端口的能力只做只读行。 */
+let AUTO_CAPS = null;
+function num(v){ return (v==null||v===undefined) ? "—" : fmt(v); }
+function capRow(name, desc, stat){
+  return `
+  <div class="svc">
+    <div class="sname"><span class="name">${name}</span></div>
+    <p class="sdesc">${desc}</p>
+    <div class="lead" aria-hidden="true"></div>
+    <div class="stop-h"><span class="ts">${stat}</span></div>
+  </div>`;
+}
+function genCard(nameZh, nameEn, descZh, descEn, stat){
+  const nm = LANG==="zh" ? `${nameZh} ${nameEn}` : `${nameEn} ${nameZh}`;
+  const ds = LANG==="zh" ? `${descZh}<br>${descEn}` : `${descEn}<br>${descZh}`;
+  return `
+  <div class="gcard">
+    <div class="gn">${nm}</div>
+    <div class="gs">${stat}</div>
+    <div class="gd">${ds}</div>
+    <div class="flowline" aria-hidden="true"><i></i></div>
+  </div>`;
+}
+function thinkBlock(c){
+  const still = (typeof STATIC_MODE!=="undefined" && STATIC_MODE);
+  const steps = [t("tkF1"), t("tkF2"), t("tkF3"), t("tkF4")];
+  let h = '<div class="think-box">';
+  h += '<div class="think-line">'+t("tkLine")+'</div>';
+  h += '<div class="think-flow" role="img" aria-label="'+steps.join(' \u2192 ')+'">';
+  steps.forEach((s,i)=>{
+    if(i) h += '<span class="parr" aria-hidden="true">\u2192</span>';
+    h += '<span class="pnode">'+s+'</span>';
+  });
+  h += '</div>';
+  const socStat = c.soc ? (c.soc.planned ? t("tkPlanned")+" / "+t("tkReadOnly") : t("tkReadOnly")) : "\u2014";
+  const kitStat = c.loop ? (num(c.loop.guides)+" guides · "+num(c.loop.learned)+" scripts") : "\u2014";
+  const orchStat = c.orchestrator ? (num(c.orchestrator.docs)+" docs · "+num(c.orchestrator.skills)+" skills") : "\u2014";
+  h += '<div class="think-cards'+(still?" still":"")+'">';
+  h += '<div class="think-card"><div class="tk-name">'+t("tkCardSocName")+'</div>'
+    + '<div class="tk-desc">'+t("tkCardSocD")+'</div>'
+    + '<div class="tk-stat" data-real="1">'+socStat+'</div></div>';
+  h += '<div class="think-card"><div class="tk-name">'+t("tkCardKits")+'</div>'
+    + '<div class="tk-desc">'+t("tkCardKitsD")+'</div>'
+    + '<div class="tk-stat" data-real="1">'+kitStat+' · '+orchStat+'</div></div>';
+  h += '</div>';
+  h += '<div class="think-note">'+t("tkNote")+'</div>';
+  h += '</div>';
+  return h;
+}
+/* ---- RESEARCH diagram: sources-capabilities-stored (numbers from /api/automation, fallback em dash) ---- */
+function rschLink(id){
+  return '<div class="rsch-link" aria-hidden="true"><svg viewBox="0 0 54 24" preserveAspectRatio="none">'
+    + '<defs><marker id="'+id+'" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">'
+    + '<path d="M0,0 L8,4 L0,8 Z" fill="#0071e3"></path></marker></defs>'
+    + '<line x1="2" y1="12" x2="46" y2="12" class="rsch-line" marker-end="url(#'+id+')"></line></svg></div>';
+}
+function rschNode(b, s){
+  return '<div class="rsch-node"><b>'+b+'</b>'+(s?'<span>'+s+'</span>':'')+'</div>';
+}
+function rschDiagram(c){
+  const zh = LANG==="zh";
+  const still = (typeof STATIC_MODE!=="undefined" && STATIC_MODE);
+  const r = c.research || {};
+  const taskStat = c.tasks ? (num(c.tasks.total)+" · "+(zh?"完成":"done")+" "+num(c.tasks.done)+" · "+(zh?"今日":"today")+" "+num(c.tasks.today)) : "—";
+  const loopStat = c.loop ? (num(c.loop.guides)+" guides · "+num(c.loop.learned)+" scripts") : "—";
+  const fiStat = r.fenginvest_scripts ? num(r.fenginvest_scripts.scripts)+" scripts" : "—";
+  const skStat = r.search_king ? (r.search_king.has_scraper ? num(r.search_king.backends)+" backends" : "—") : "—";
+  const aeStat = r.aiexport ? (r.aiexport.exists ? num(r.aiexport.dirs)+" dirs · "+num(r.aiexport.scripts)+" scripts" : "—") : "—";
+  const sqlStat = r.sql_dbs ? num(r.sql_dbs.count)+" .db" : "—";
+  const sub = zh?"一条主路：行情 API → FengInvest 脚本 → 本地 SQL 建库；一条副路：自建通用系统先获取授权再接 API；Search King 旗舰通搜全网；AIExport 聚合各家 AI 输出，沉淀自有模型":"One main lane: market APIs -> FengInvest scripts -> self-built local SQL stores; one second lane: a self-built generic system gets authorized first, then calls APIs; the Search King flagship searches any site, from anywhere; AIExport aggregates AI outputs into self-built models";
+  const note = zh?"通用自动化工具 + 自进步 AI：每次执行留记录，供下一次复用":"General automation tooling + self-improving AI: each run leaves reusable records";
+  let h = '<div class="rsch-wrap"><div class="rsch-sub">'+sub+'</div>'
+    + '<div class="rsch-diagram'+(still?' still':'')+'" id="rschDiagram" role="img" aria-label="'+(zh?'研究信息全景：源头到对接再到沉淀':'Research information panorama: sources to engines to stores')+'">';
+  h += '<div class="rsch-stage"><div class="rsch-stitle">'+(zh?'入口 Sources':'Sources')+'</div><div class="rsch-nodes">';
+  h += rschNode(zh?'行情 API':'Market data APIs', zh?'对接行情数据接口':'wired to market data APIs');
+  h += rschNode(zh?'第二路：授权 → API':'Second lane: authorize \u2192 APIs', zh?'自建通用系统先授权再接 API · 本地只读，凭据绝不展示':'self-built generic system gets authorized first, then calls APIs \u00b7 read-only locally, credentials never shown');
+  h += rschNode(zh?'Search King 旗舰':'Search King flagship', zh?'通用：搜任何网站、到任何地方':'generic: search any site, from anywhere');
+  h += '</div></div>';
+  h += rschLink('rschA1');
+  h += '<div class="rsch-stage"><div class="rsch-stitle">'+(zh?'对接 Engines':'Engines')+'</div><div class="rsch-nodes">';
+  h += '<div class="rsch-node"><b>'+(zh?'FengInvest 脚本':'FengInvest scripts')+'</b><span>'+(zh?'对接行情 API 的量化脚本':'quant scripts wired to market APIs')+'</span><span class="rsch-num">'+fiStat+'</span></div>';
+  h += '<div class="rsch-node"><b>'+(zh?'通用检索入库':'Generic retrieval to stores')+'</b><span>'+(zh?'多后端反爬，结果供建库':'multi-backend crawling, results feed our stores')+'</span><span class="rsch-num">'+skStat+'</span></div>';
+  h += '<div class="rsch-node"><b>'+(zh?'AIExport 聚合':'AIExport aggregation')+'</b><span>'+(zh?'聚合各家 AI 输出':'collects outputs across AI providers')+'</span><span class="rsch-num">'+aeStat+'</span></div>';
+  h += '</div></div>';
+  h += rschLink('rschA2');
+  h += '<div class="rsch-stage"><div class="rsch-stitle">'+(zh?'沉淀 Stores':'Stores')+'</div><div class="rsch-nodes">';
+  h += '<div class="rsch-node"><b>'+(zh?'自建 SQL 建库':'Self-built SQL stores')+'</b><span>'+(zh?'行情等数据落库，文件留在原处':'market data settles locally, files stay where they are')+'</span><span class="rsch-num">'+sqlStat+'</span></div>';
+  h += '<div class="rsch-node"><b>'+(zh?'自有模型':'Self-built models')+'</b><span>'+(zh?'沉淀知识训练本方模型，AIExport 现聚为未来铺路':'settled knowledge trains our own models; AIExport aggregation paves the way')+'</span><span class="rsch-num">—</span></div>';
+  h += '</div></div>';
+  h += '</div><div class="rsch-note">'+note+'</div>';
+  h += '<div class="rsch-note">'+taskStat+' · '+loopStat+'</div></div>';
+  return h;
+}
+/* ---- 创作组专属：本组自用卡（I18N key 驱动；en 模式零中文，zh 模式双语）---- */
+function crCard(nmZh, nmEn, key, stat, cls){
+  const zh = LANG==="zh";
+  const nm = nmZh===nmEn ? nmZh : (zh ? nmZh+" "+nmEn : nmEn+" "+nmZh);
+  const ds = zh ? t(key)+"<br>"+I18N.en[key] : t(key);
+  return '<div class="gcard cr'+(cls?" "+cls:"")+'">'
+    + '<div class="gn">'+nm+'</div>'
+    + '<div class="gs">'+stat+'</div>'
+    + '<div class="gd">'+ds+'</div>'
+    + '<div class="flowline" aria-hidden="true"><i></i></div>'
+    + '</div>';
+}
+function renderAutomation(){
+  const body = $("autoBody");
+  if(!body) return;
+  const c = AUTO_CAPS || {};
+  const r = c.research || {};
+  const L = k => (LANG==="zh" ? k.zh : k.en);
+  const fiStat = r.fenginvest_scripts ? num(r.fenginvest_scripts.scripts)+" scripts" : "—";
+  const skStat = r.search_king ? (r.search_king.has_scraper ? num(r.search_king.backends)+" backends" : "—") : "—";
+  const aeStat = r.aiexport ? (r.aiexport.exists ? num(r.aiexport.dirs)+" dirs · "+num(r.aiexport.scripts)+" scripts" : "—") : "—";
+  const groups = [
+    {t:{en:"Research", zh:"研究"}, rows:[
+      {html:rschDiagram(c)},
+      {html:capRow(t("rschCorpusT"), t("rschCorpusD"),
+        c.novel ? `${num(c.novel.chapters)} ch · ${c.novel.txt_mb==null?"—":c.novel.txt_mb+" MB"}` : "—")},
+      {html:capRow(t("rschLedgerT"), t("rschLedgerD"),
+        (c.tasks||c.loop) ? [
+          c.tasks ? `${num(c.tasks.total)} · ${LANG==="zh"?"完成":"done"} ${num(c.tasks.done)}` : null,
+          c.loop ? `${num(c.loop.records)} records · ${num(c.loop.guides)} guides · ${num(c.loop.learned)} scripts` : null
+        ].filter(Boolean).join(" · ") : "—")},
+
+      {html:capRow("FengInvest", t("rFiDesc"), fiStat)},
+      {html:capRow("Search-King", t("rSkDesc"), skStat)},
+      {html:capRow("AIExport", t("rAeDesc"), aeStat)},
+    ]},
+    {t:{en:"Think", zh:"思考"}, rows:[
+      {html:thinkBlock(c)},
+    ]},
+    {t:{en:"Create", zh:"创作"}, rows:[
+      {html:'<div class="create-def"><span class="cr-def-main"><span class="cr-def-kicker">'+(LANG==="zh"?"创作":"CREATE")+'</span>'+t("createDef")+'</span>'
+        + (LANG==="zh" ? '<span class="cr-def-en">'+t("createDefEn")+'</span>' : '')+'</div>'},
+      {html:`<div class="gen-grid">`
+        + crCard("FengMedia", "FengMedia", "crFmD",
+            c.fengmedia ? `${num(c.fengmedia.projects)} projects · ${c.fengmedia.latest_project||"—"}` : "—",
+            "cr-lead")
+        + crCard("文本生成", "Text", "crTextD", "—")
+        + crCard("图像生成", "Image", "crImgD", "—")
+        + crCard("音乐生成", "Music", "crMusD",
+            c.music ? `${num(c.music.tools)} tools${c.music.has_gate?" · gate ✓":""}` : "—")
+        + crCard("语音 TTS · TTS-UI", "Voice TTS · TTS-UI", "crTtsD",
+            c.tts ? (c.tts.has_exe ? (LANG==="zh"?"已打包":"bundled") : "—") : "—")
+        + crCard("数字人", "Avatars", "crAvaD",
+            c.avatar ? `${LANG==="zh"?"真人":"live"} ✓ · ${LANG==="zh"?"动漫验证中":"anime verifying"}` : "—")
+        + crCard("视频生成", "Video", "crVidD", "—")
+        + `</div>`},
+      {html:capRow("FengInvest",
+        t("crFiD"),
+        (c.research && c.research.fenginvest_scripts) ? num(c.research.fenginvest_scripts.scripts)+" scripts" : "—")},
+    ]},
+    {t:{en:"Act", zh:"行动"}, rows:[
+      {html:'<div class="act-def"><div class="act-def-line" data-i18n="actDef">'+t("actDef")+'</div></div>'},
+      {html:capRow(t("actHunterName"), t("actHunterDesc"),
+        (c.autofill ? ((c.autofill.has_cli?"CLI \u2713":"\u2014")+" \u00b7 "+num(c.autofill.profiles)+" profiles") : "\u2014")
+        + " \u00b7 " + t("actLocal"))},
+      {html:capRow(t("actMailName"), t("actMailDesc"), t("actLocal")+" \u00b7 authorized \u2192 API")},
+      {html:capRow(t("actChanName"), t("actChanDesc"), "GitHub + gitee")},
+      {html:capRow(t("actApi"), t("actApiDesc")+" \u00b7 "+t("actNoCreds")+" \u00b7 "+t("actReadOnly"), "\u2014")},
+      {html:capRow(t("actSocName"), t("actSocDesc"),
+        (c.autofill ? ((c.autofill.has_cli?"CLI":"\u2014")+" \u00b7 "+num(c.autofill.profiles)+" profiles") : "\u2014")
+        + ((c.soc && c.soc.planned) ? " \u00b7 "+t("actPlanned") : ""))},
+    ]},
+    {t:{en:"Self-Improve", zh:"自我改进"}, rows:[
+      {html:`<div class="si-loop">`
+        + `<div class="si-quote">${t("siQuote")}</div>`
+        + `<div class="si-steps">`
+        + `<div class="si-step"><b>${t("siRec")}</b><span>${t("siRecNote")}</span></div>`
+        + `<span class="si-arr" aria-hidden="true">&rarr;</span>`
+        + `<div class="si-step"><b>${t("siRule")}</b><span>${t("siRuleNote")}</span></div>`
+        + `<span class="si-arr" aria-hidden="true">&rarr;</span>`
+        + `<div class="si-step"><b>${t("siBack")}</b><span>${t("siBackNote")}</span></div>`
+        + `</div></div>`},
+      {html:capRow("FengOrchestrator",
+        t("siOrch"),
+        c.orchestrator && c.orchestrator.exists
+          ? `${num(c.orchestrator.docs)} ${t("siDocs")} · ${num(c.orchestrator.skills)} ${t("siSkills")}`
+          : "—")},
+      {html:capRow("FengASNI",
+        t("siAsni"),
+        c.asni && c.asni.exists
+          ? `${num(c.asni.profiles)} ${t("siProfiles")} · ${num(c.asni.shared)} ${t("siShared")}`
+          : "—")},
+    ]},
+  ];
+  body.innerHTML = groups.map((g,gi)=>`
+    <div class="layer">${L(g.t)}</div>
+    <div class="panel svcs reveal in">${g.rows.map(r=>r.svc?svcRow(r.svc):r.html).join("")}</div>
+    ${gi<groups.length-1?`<div class="flow" aria-hidden="true"><span class="farr">↓</span></div>`:""}
+  `).join("");
+  body.querySelectorAll("[data-i18n]").forEach(el=>{ el.textContent = t(el.dataset.i18n); });
+  body.querySelectorAll("button[data-act]").forEach(btn=>{
+    btn.addEventListener("click",()=>controlService(btn.dataset.act, btn.dataset.name));
+  });
+}
+async function loadAutomation(){
+  try{
+    const r = await fetch("/api/automation");
+    const d = await r.json();
+    if(d && d.ok) AUTO_CAPS = d.caps || {};
+  }catch(e){}
+  renderAutomation();
+}
+
+/* ================= 论文板块：五系统审计只读表 ================= */
+function renderAudit(){
+  const box = $("auditBody");
+  if(!box) return;
+  const zh = LANG==="zh";
+  const rows = [
+    {n:"FengInvest", tag:"✅", d: zh?"标杆：数据本地、操作走对话、UI 只读、产出可备份":"Model case: local data, dialogue ops, read-only UI, backed-up output", ok:true},
+    {n:"FengMedia", tag:"⚠️", d: zh?"内容生产：写操作收进对话，UI 退为只读":"Content pipeline: writes move to dialogue, UI stays read-only", ok:false},
+    {n:"FlyGo", tag:"➖", d: zh?"对外产品：面板是交付物，面板内嵌客户对话层":"External product: panel is the deliverable, dialogue embedded inside", ok:false},
+    {n:"FengOS", tag:"✅", d: zh?"生态观景台：聚合只读视图，不搬数据":"Ecosystem viewer: aggregates read-only views, never moves data", ok:true},
+    {n:"TTS-UI", tag:"➖", d: zh?"桌面小工具：无 AI 层需求，不动":"Desktop utility: no AI layer needed, unchanged", ok:false},
+  ];
+  box.innerHTML = rows.map(r=>`
+  <div class="svc">
+    <div class="sname"><span class="name">${r.n}</span></div>
+    <p class="sdesc">${r.d}</p>
+    <div class="lead" aria-hidden="true"></div>
+    <div class="stop-h"><span class="tag${r.ok?" ok":""}">${r.tag}</span></div>
+  </div>`).join("");
+}
+
+/* ================= 项目列表 ================= */
+function cleanDesc(s){
+  return String(s||"").replace(/\*\*/g,"").replace(/\[([^\]]*)\]\(([^)]*)\)/g,"$1");
+}
+async function loadProjects(){
+  let data=[];
+  try{ const r = await fetch("/api/projects"); data=(await r.json()).projects||[]; }catch(e){}
+  $("projCount").textContent = `${data.length}`;
+  $("plist").innerHTML = data.map(p=>`
+    <div class="prow" data-name="${p.name}">
+      <div class="nm">${p.name}<span class="lang">${p.lang}${p.git?"":" · no git"}</span></div>
+      <div class="ds">${cleanDesc(p.desc)}</div>
+      <div class="bar"><i data-w="${p.activity}"></i></div>
+      <div class="act">${p.lastCommitDaysAgo==null?"":`<span>${p.lastCommitDaysAgo}d</span>`}<span>${p.codeKB} KB</span></div>
+    </div>
+    <div class="commits" data-c="${p.name}"></div>`).join("");
+  requestAnimationFrame(()=>document.querySelectorAll(".bar i").forEach(b=>b.style.width=b.dataset.w+"%"));
+  document.querySelectorAll(".prow").forEach(row=>{
+    row.addEventListener("click",async()=>{
+      const name=row.dataset.name, box=document.querySelector(`.commits[data-c="${name}"]`);
+      if(box.style.display==="block"){ box.style.display="none"; return; }
+      if(!box.dataset.loaded){
+        try{ const r=await fetch(`/api/project/${encodeURIComponent(name)}/commits`);
+          const d=await r.json();
+          box.innerHTML = (d.commits||[]).map(c=>`<div><span class="cd">${c.date}</span><span class="cs">${c.summary}</span></div>`).join("")
+            || `<div style="color:var(--text-3)">no commits found</div>`;
+        }catch(e){ box.innerHTML=`<div style="color:var(--text-3)">load failed</div>`; }
+        box.dataset.loaded="1";
+      }
+      box.style.display="block";
+    });
+  });
+}
+async function loadReport(){
+  let d;
+  try{ const r=await fetch("/api/daily-report?days=1"); d=await r.json(); }catch(e){ return; }
+  if(!d || !Array.isArray(d.items)) return;
+  const fb = d.fallback ? `<span class="pill2">${t("last7")}</span>` : `<span class="pill2">${d.totalCommits} ${t("commitsToday")}</span>`;
+  $("repbody").innerHTML = `
+    <div class="head"><b>${d.days===1?t("today"):t("lastDays")} · ${d.activeProjects}/${d.scannedProjects} ${t("projectsWord")}</b>${fb}</div>
+    <ul>${d.items.slice(0,10).map(i=>`
+      <li><span class="cnt">${i.count}</span><span class="nm">${i.name}</span>
+      <span class="lt">${i.latest}</span><span class="tm">${i.time}</span></li>`).join("")}
+    </ul>`;
+}
+/* ================= reveal + 导航高亮 + Dock 形变 ================= */
+const io = new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){e.target.classList.add("in"); io.unobserve(e.target);} }),{threshold:.12});
+function observeReveal(){ document.querySelectorAll(".reveal:not(.in)").forEach(el=>{ el.style.transitionDelay=(Array.from(el.parentNode.children).indexOf(el)%6)*60+"ms"; io.observe(el); }); }
+const secs=[...document.querySelectorAll("section[id],header[id]")];
+window.addEventListener("scroll",()=>{
+  let cur=secs[0]?.id;
+  secs.forEach(s=>{ if(s.getBoundingClientRect().top<innerHeight*.4) cur=s.id; });
+  document.querySelectorAll(".tabbar a").forEach(a=>a.classList.toggle("on",a.getAttribute("href")==="#"+cur));
+  document.querySelector(".tabbar").classList.toggle("scrolled", scrollY>40);
+},{passive:true});
+
+/* ================= boot ================= */
+applyLang();
+if(STATIC_MODE) document.querySelectorAll(".tri-line").forEach(l=>l.style.animation="none");
+galaxyTried = true;
+loadGraph(); loadProjects(); loadReport(); loadAutomation();
+pollControls(); setInterval(pollControls, 15000);
+setInterval(()=>{ if(!GRAPH) loadGraph(); }, 8000);   /* /api/graph 失败时持续重试 */
+observeReveal();
+function tickClock(){
+  const loc = LANG==="zh"?"zh-CN":"en-US";
+  $("footTime").textContent = new Intl.DateTimeFormat(loc, {dateStyle:"medium", timeStyle:"short"}).format(new Date());
+}
+tickClock(); setInterval(tickClock,30000);
+window.addEventListener("resize",()=>drawGalaxy());
+</script>
+<script>
+/* ============ 鼠标跟随光晕（细指针才启用；rAF 节流 + 弹性跟随） ============ */
+(()=>{
+  const glow=document.querySelector(".glow");
+  if(!glow||!matchMedia("(pointer:fine)").matches||matchMedia("(prefers-reduced-motion:reduce)").matches) return;
+  let tx=innerWidth/2,ty=innerHeight/3,x=tx,y=ty,shown=false,raf=null;
+  function step(){
+    x+=(tx-x)*.12; y+=(ty-y)*.12;
+    glow.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%)`;
+    if(Math.abs(tx-x)+Math.abs(ty-y)>.5) raf=requestAnimationFrame(step); else raf=null;
+  }
+  addEventListener("pointermove",e=>{
+    tx=e.clientX; ty=e.clientY;
+    if(!shown){shown=true;document.body.classList.add("has-glow");}
+    if(!raf) raf=requestAnimationFrame(step);
+  },{passive:true});
+  document.addEventListener("mouseleave",()=>{shown=false;document.body.classList.remove("has-glow");});
+})();
+</script>
+</body>
+</html>

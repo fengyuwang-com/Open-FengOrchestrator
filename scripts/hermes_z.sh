@@ -60,7 +60,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # 优先用 PATH 里的 hermes；否则回退到本机绝对路径
 if [ -x "${HERMES_BIN:-}" ]; then :; else
     HERMES_BIN="$(command -v hermes 2>/dev/null)" || true
-    [ -z "${HERMES_BIN:-}" ] && HERMES_BIN="/c/Users/yourusername/AppData/Local/hermes/hermes-agent/venv/Scripts/hermes"
+    [ -z "${HERMES_BIN:-}" ] && HERMES_BIN="/c/Users/<user>/AppData/Local/hermes/hermes-agent/venv/Scripts/hermes"
 fi
 
 usage() {

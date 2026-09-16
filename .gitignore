@@ -20,3 +20,6 @@ webcli/server_out.log
 # ZCode 本地会话产物
 .zcode/
 logs/fleet/
+
+# FengOS 运行时数据（缓存/截图/日志不入库；壁纸属于代码资产，入仓）
+FengOS/data/

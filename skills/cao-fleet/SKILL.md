@@ -1,6 +1,6 @@
 ---
 name: cao-fleet
-description: 通过 CAO（awslabs/cli-agent-orchestrator，跑在 WSL 的 localhost:9889）控制面 API 召唤与管理 AI agent 舰队。当董事长要求"召唤/派/拉起 N 个 agent"、"研究一下 XX 架构/主题"、"开一堆干事的会话"、"看干事们在干嘛/有没有摸鱼"（查 sessions/terminals 状态与输出）、"给某个干事派活/发消息"时使用。自研封装，随本仓库开源。
+description: 通过 CAO（awslabs/cli-agent-orchestrator，跑在 WSL 的 localhost:9889）控制面 API 召唤与管理 AI agent 舰队。当董事长要求"召唤/派/拉起 N 个 agent"、"研究一下 XX 架构/主题"、"开一堆干事的会话"、"看干事们在干嘛/有没有摸鱼"（查 sessions/terminals 状态与输出）、"给某个干事派活/发消息"时使用。自研闭源封装，不依赖开源 skill。
 ---
 
 # CAO 舰队召唤
