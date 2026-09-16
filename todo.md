@@ -24,7 +24,7 @@
 ### 编排演进
 - [ ] **三项目自主进化机制待激活**：FengInvest/FengMedia/FlyGo 已安装 MISSION.md+docs/自主进化机制.md（可撤销，删 MISSION.md 即停用）；待①董事长改写各项目 MISSION 总目标/DoD ②配置定时点火器投喂节拍 prompt 方才生效。
 - [x] 2026-09-10 **自主进化第二轮深度研究（必须写代码吗）**：结论=写代码非必要条件，定案混合路线（文档层治理不变+补评分/任务生成/停止条件三个最小脚本件），已写入 docs/自主进化通用方案.md 第五节；三份桌面复盘已归档 docs/archive/（桌面原件移除）。
-- [x] 2026-09-10 **自主进化通用方案**：桌面三份通宵复盘（FengInvest/FengMedia/FlyGo）已合并为 [docs/自主进化通用方案.md](自主进化通用方案.md)，含联网调研的业界五要素对照与指示模板。原桌面文档未删除。
+- [x] 2026-09-10 **自主进化通用方案**：桌面三份通宵复盘（FengInvest/FengMedia/FlyGo）已合并为 docs/自主进化通用方案.md，含联网调研的业界五要素对照与指示模板。原桌面文档未删除。
 - [ ] **CAO 全量编排实跑**（保持待办）：写 Hermes provider profile（`hermes chat --yolo`），经 `cao launch` + tmux 长驻会话驱动；验证会话审计、完成检测、`cao session list/read`。注：日常指挥已可走 cao-ceo Skill + cao-fleet，本项为 CAO 原生全能力验证。
 - [x] 2026-08-15 **多 Worker 并行**：3 个 `hermes -z` 并行子进程实测真并行（wall-clock ≈ 单任务耗时，无串行）；webcli 改造即用 4 Hermes 并行分块（结构/测试/文档/CI），归集联调成功
 - [x] **审批门已由 Code 在回路原生覆盖**（保障层拆穿结论，2026-08-23，无需自建）：CEO agent 在回路直接问董事长 = 天然审批门；签字验收打包呈批在 cao-ceo skill 里。原"hermes -z 强制 auto-approve 补审批门"方案作废。
