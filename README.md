@@ -28,15 +28,12 @@ Claude Code ｜ Codex CLI ｜ OpenCode ｜ Hermes ｜ OpenClaw(可选) ｜ Z Cod
 | 文件 | 内容 |
 |---|---|
 | [`docs/愿景与路线图.md`](docs/愿景与路线图.md) | **最高纲领**（2026-08-23）：一位真人 + 数百 AI 员工、AI 带领 AI（董事长→CEO→专业 AI 人士）、三大痛点、开源栈满足度评估、四阶段路线 |
-| [`docs/达成目标架构蓝图.md`](docs/达成目标架构蓝图.md) | **架构总纲**（2026-08-24，两份蓝图合并）：五层系统（意图/组织/人才/执行/保障）、人才库建设战略（三条供应链+HR 五步入编流水线+淘汰机制）、复用白名单+组织级参照（OneManCompany 等）、"保障层 4/5 原生已覆盖"拆穿结论 |
 | [`docs/两层界面原则与全生态审查.md`](docs/两层界面原则与全生态审查.md) | **两层界面原则（2LIP）**（2026-09-13 立规）：对话层+观景层+本地/备份约束；六系统符合性审计明细；业界四脉络对位（chat-first/Generative UI/MCP Apps/local-first）；三元界面命题（文档=AI 治理面）；执行计划六条 |
 | [`docs/选型与研究.md`](docs/选型与研究.md) | 40+ 项目调研清单、排名、判断依据、被淘汰项 |
 | [`docs/落地方案.md`](docs/落地方案.md) | 目标机器实施蓝图、里程碑、风险与备选 |
 | [`docs/部署与使用方案.md`](docs/部署与使用方案.md) | 董事长视角使用蓝图：角色图解、本机实况、首期用 Hermes 验证手感 |
 | [`docs/舰队各司其职.md`](docs/舰队各司其职.md) | **角色分工编排**（2026-08-16 实测）：6 个内置角色、assign/handoff/send_message 三机制、supervisor 指挥 vs workflow 流水线两条路线、自定义角色写法 |
 | [`docs/archive/agency-agents-人才库与组织手册对接.md`](docs/archive/agency-agents-人才库与组织手册对接.md) | 研究过程存档（2026-08-24 归档）：agency-agents-zh 深挖——275 人才库 + NEXUS 组织手册的对接研究，结论已并入架构总纲 |
-| [`docs/CEO-Playbook-v0.md`](docs/CEO-Playbook-v0.md) | **CEO 层作战手册**（2026-08-23，§八 2026-08-24 实战修正）：NEXUS 可执行化——5 步标准动作、三编制选择、七阶段裁剪、质量门禁、NEXUS 交接模板、TTS UI 三场实战教训（任务书防呆四要素/断线容错/升级纪律） |
-| [`skills/cao-ceo/SKILL.md`](skills/cao-ceo/SKILL.md) | **董事长指挥层 Skill**：一句话目标 → 自动按 NEXUS 调兵遣将（判编制→拆阶段→召唤→卡门禁→回报），复用 cao-fleet，召唤时自动注入知识源（docs/ + FENGMEM.md），验收 spawn reviewer 打分，审批在回路直接问董事长 |
 | [`skills/cao-fleet/`](skills/cao-fleet/) | 自研闭源 skill：CAO 舰队召唤（SKILL.md + cao_fleet.sh + agents.yaml）。实际使用位置在 `~/.zcode/skills/cao-fleet/`（ZCode 调用），本目录为版本管理副本，改动后需同步两边 |
 | [`agency-roles/导入清单.md`](agency-roles/导入清单.md) | **人才库导入记录**（2026-08-23）：263 profile 全量装入（19 部门零剔除）、86 个【在编】核心标记、部门分布、MIT 署名已全量修复 |
 
